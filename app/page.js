@@ -89,6 +89,7 @@ export default function Home() {
         body: JSON.stringify({ displayName: name, baseCurrency: currency, username }),
       });
       if (!data.success) throw new Error(data.error || 'Unable to create wallet');
+      apiFetch('/api/wallet/setup', { method: 'POST' }).catch(() => {});
       await refreshUser();
       router.push('/dashboard');
     } catch (err) {
@@ -107,6 +108,7 @@ export default function Home() {
       });
       if (!data.success) throw new Error(data.error || 'Unable to import wallet');
       setSeed('');
+      apiFetch('/api/wallet/setup', { method: 'POST' }).catch(() => {});
       await refreshUser();
       router.push('/dashboard');
     } catch (err) {

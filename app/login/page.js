@@ -10,8 +10,11 @@ function LoginInner() {
   const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
 
   const [email, setEmail] = useState('');
+  const [sentEmail, setSentEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [token, setToken] = useState('');
   const [working, setWorking] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const [supabase, setSupabase] = useState(null);
@@ -35,7 +38,7 @@ function LoginInner() {
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  const submit = async (event) => {
+  const sendCode = async (event) => {
     event.preventDefault();
     if (!supabase || working || cooldown) return;
 
@@ -58,16 +61,45 @@ function LoginInner() {
       });
 
       if (authError) {
-        setError('Unable to send a sign-in link. Please try again.');
+        setError('Unable to send a sign-in code. Please try again.');
         return;
       }
 
+      setSentEmail(clean);
       setSent(true);
+      setToken('');
       setCooldown(60);
     } catch {
-      setError('Unable to send a sign-in link. Please try again.');
+      setError('Unable to send a sign-in code. Please try again.');
     } finally {
       setWorking(false);
+    }
+  };
+
+  const verifyCode = async (event) => {
+    event.preventDefault();
+    if (!supabase || verifying || token.length !== 6) return;
+
+    setVerifying(true);
+    setError('');
+
+    try {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: sentEmail,
+        token,
+        type: 'email',
+      });
+
+      if (verifyError) {
+        setError('Invalid or expired code. Try again.');
+        return;
+      }
+
+      router.replace(next);
+    } catch {
+      setError('Unable to verify the code. Please try again.');
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -97,25 +129,47 @@ function LoginInner() {
                 </div>
                 <p className="text-sm font-bold text-[#1C1C1E]">Check your email</p>
                 <p className="text-xs text-[#8E8E93] mt-2 leading-relaxed">
-                  If that email can sign in, a secure link is on its way. Open it on this device.
+                  We sent a 6-digit code to <span className="font-semibold text-[#1C1C1E]">{sentEmail}</span>.
+                  Enter it below, or click the link in the email.
                 </p>
               </div>
+
+              <form onSubmit={verifyCode} className="space-y-3">
+                <input
+                  value={token}
+                  onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full px-4 py-3.5 rounded-2xl text-center font-mono text-2xl font-bold tracking-[0.35em] input-field"
+                />
+                {error && <p className="text-xs text-[#1C1C1E] font-semibold">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={verifying || token.length !== 6}
+                  className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform"
+                >
+                  {verifying ? 'Verifying...' : 'Verify code'}
+                </button>
+              </form>
+
               <button
-                onClick={submit}
+                onClick={sendCode}
                 disabled={cooldown > 0 || working}
                 className="w-full py-3.5 rounded-2xl text-sm font-semibold bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] disabled:opacity-40"
               >
-                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend link'}
+                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
               </button>
               <button
-                onClick={() => { setSent(false); setCooldown(0); }}
+                onClick={() => { setSent(false); setCooldown(0); setToken(''); setError(''); }}
                 className="w-full text-xs text-[#8E8E93] font-medium"
               >
                 Use a different email
               </button>
             </div>
           ) : (
-            <form onSubmit={submit} className="space-y-4">
+            <form onSubmit={sendCode} className="space-y-4">
               <div>
                 <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wider font-semibold">
                   Email
@@ -135,7 +189,7 @@ function LoginInner() {
                 disabled={working || !email}
                 className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform"
               >
-                {working ? 'Sending link...' : 'Email me a sign-in link'}
+                {working ? 'Sending code...' : 'Email me a sign-in code'}
               </button>
               <p className="text-[11px] text-[#8E8E93] text-center leading-relaxed">
                 Testnet demo only. No real money is involved.

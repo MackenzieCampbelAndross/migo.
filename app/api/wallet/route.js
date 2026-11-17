@@ -105,7 +105,7 @@ export async function POST(req) {
 
     let created;
     try {
-      created = await createTestnetWallet();
+      created = await createTestnetWallet(profile.base_currency);
     } catch (error) {
       safeLog('error', 'wallet.testnet_create_failed', {
         userId: user.id,
@@ -180,7 +180,7 @@ export async function PUT(req) {
 
     let imported;
     try {
-      imported = await importWallet(body.seed);
+      imported = await importWallet(body.seed, profile.base_currency);
     } catch (error) {
       if (error?.message === 'Invalid wallet seed' || error?.message === 'Wallet was not found on the XRPL testnet') {
         throw new ApiError(400, error.message);
