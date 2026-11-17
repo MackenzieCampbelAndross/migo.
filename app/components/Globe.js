@@ -184,7 +184,7 @@ export default function Globe({ onTransfer }) {
 
     // Load countries
     try {
-      const res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+      const res = await fetch('/data/countries-110m.json');
       const topo = await res.json();
       const geo = decodeTopo(topo, 'countries');
       GG.add(buildCountries(geo, s));
