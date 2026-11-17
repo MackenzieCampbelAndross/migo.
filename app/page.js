@@ -49,7 +49,7 @@ const POPUP_POSITIONS = [
 ];
 
 export default function Home() {
-  const { wallet, user, loading, authError, refreshUser } = useWallet();
+  const { wallet, user, loading, authError, refreshUser, logout } = useWallet();
   const router = useRouter();
   const [mode, setMode] = useState(null); // null | 'create' | 'import'
   const [seed, setSeed] = useState('');
@@ -117,6 +117,9 @@ export default function Home() {
     setWorking(false);
   };
 
+  const needsWallet = Boolean(user) && !wallet && !loading;
+  const activeMode = needsWallet ? (mode || 'create') : mode;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#F8F8FA]">
@@ -144,10 +147,26 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Bottom wallet panel */}
-      <div className="flex-shrink-0 px-5 pt-4 pb-8 safe-bottom relative z-10">
+      {/* Wallet setup modal after login, or wallet CTA before login */}
+      <div className={needsWallet
+        ? 'fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm px-4 pb-6 sm:pb-0'
+        : 'flex-shrink-0 px-5 pt-4 pb-8 safe-bottom relative z-10'}>
+        <div className={needsWallet ? 'w-full max-w-md rounded-[28px] border border-[#E5E5EA] bg-[#F8F8FA] p-5 shadow-2xl max-h-[88vh] overflow-y-auto' : ''}>
+        {needsWallet && (
+          <div className="mb-4">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#8E8E93] font-semibold">Welcome to Migo</p>
+            <h2 className="text-xl font-bold text-[#1C1C1E] mt-1">
+              {activeMode === 'import' ? 'Import your wallet' : 'Create your wallet'}
+            </h2>
+            <p className="text-xs text-[#8E8E93] mt-1 leading-relaxed">
+              {activeMode === 'import'
+                ? 'Use your existing seed to restore access.'
+                : 'Pick a unique username and your primary currency.'}
+            </p>
+          </div>
+        )}
         {/* Mode selection */}
-        {!mode && (
+        {!activeMode && (
           <div className="space-y-3">
             {authError ? (
               <div className="p-4 rounded-2xl bg-[#F2F2F7] border border-[#E5E5EA] text-xs text-[#1C1C1E] leading-relaxed">
@@ -188,9 +207,11 @@ export default function Home() {
         )}
 
         {/* Create form */}
-        {mode === 'create' && (
+        {activeMode === 'create' && (
           <div className="space-y-3">
-            <button onClick={() => setMode(null)} className="text-sm font-semibold text-[#1C1C1E] mb-1">← Back</button>
+            {!needsWallet && (
+              <button onClick={() => setMode(null)} className="text-sm font-semibold text-[#1C1C1E] mb-1">← Back</button>
+            )}
             <div>
               <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Username</label>
               <div className="relative">
@@ -203,13 +224,17 @@ export default function Home() {
                   className="input-field w-full pl-9 pr-4 py-3 rounded-2xl text-sm"
                 />
               </div>
+              <p className="text-[10px] text-[#8E8E93] mt-1.5 font-medium">Unique, 3–20 characters.</p>
             </div>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name (optional)"
-              className="input-field w-full px-4 py-3 rounded-2xl text-sm"
-            />
+            <div>
+              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name (optional)"
+                className="input-field w-full px-4 py-3 rounded-2xl text-sm"
+              />
+            </div>
             <div>
               <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Currency</label>
               <select
@@ -232,15 +257,22 @@ export default function Home() {
               disabled={working || !username || username.length < 3}
               className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform"
             >
-              {working ? 'Creating wallet (30-60s)...' : 'Create Wallet'}
+              {working ? 'Creating wallet (~20s)...' : 'Create Wallet'}
             </button>
+            {needsWallet && (
+              <button onClick={() => setMode('import')} className="w-full text-xs text-[#8E8E93] font-medium">
+                Already have a wallet? Import it
+              </button>
+            )}
           </div>
         )}
 
         {/* Import form */}
-        {mode === 'import' && (
+        {activeMode === 'import' && (
           <div className="space-y-3">
-            <button onClick={() => setMode(null)} className="text-sm font-semibold text-[#1C1C1E] mb-1">← Back</button>
+            {!needsWallet && (
+              <button onClick={() => setMode(null)} className="text-sm font-semibold text-[#1C1C1E] mb-1">← Back</button>
+            )}
             <div>
               <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Wallet Seed</label>
               <input
@@ -284,8 +316,19 @@ export default function Home() {
             >
               {working ? 'Importing...' : 'Import Wallet'}
             </button>
+            {needsWallet && (
+              <button onClick={() => setMode('create')} className="w-full text-xs text-[#8E8E93] font-medium">
+                Need a new wallet? Create one
+              </button>
+            )}
           </div>
         )}
+        {needsWallet && (
+          <button onClick={() => { setMode(null); logout(); }} className="w-full text-center text-[11px] text-[#8E8E93] mt-4 font-medium">
+            Sign out
+          </button>
+        )}
+        </div>
       </div>
     </div>
   );

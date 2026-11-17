@@ -1,13 +1,10 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 function LoginInner() {
   const router = useRouter();
-  const params = useSearchParams();
-  const rawNext = params.get('next') || '/';
-  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/';
 
   const [email, setEmail] = useState('');
   const [sentEmail, setSentEmail] = useState('');
@@ -25,12 +22,12 @@ function LoginInner() {
       const client = createSupabaseBrowserClient();
       setSupabase(client);
       client.auth.getUser().then(({ data }) => {
-        if (data?.user) router.replace(next);
+        if (data?.user) router.replace('/');
       }).catch(() => {});
     } catch {
       setConfigError(true);
     }
-  }, [router, next]);
+  }, [router]);
 
   useEffect(() => {
     if (!cooldown) return undefined;
@@ -56,7 +53,7 @@ function LoginInner() {
         email: clean,
         options: {
           shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/`,
         },
       });
 
@@ -78,7 +75,7 @@ function LoginInner() {
 
   const verifyCode = async (event) => {
     event.preventDefault();
-    if (!supabase || verifying || token.length !== 6) return;
+    if (!supabase || verifying || token.length < 6) return;
 
     setVerifying(true);
     setError('');
@@ -95,7 +92,7 @@ function LoginInner() {
         return;
       }
 
-      router.replace(next);
+      router.replace('/');
     } catch {
       setError('Unable to verify the code. Please try again.');
     } finally {
@@ -129,25 +126,25 @@ function LoginInner() {
                 </div>
                 <p className="text-sm font-bold text-[#1C1C1E]">Check your email</p>
                 <p className="text-xs text-[#8E8E93] mt-2 leading-relaxed">
-                  We sent a 6-digit code to <span className="font-semibold text-[#1C1C1E]">{sentEmail}</span>.
-                  Enter it below, or click the link in the email.
+                  We sent a sign-in email to <span className="font-semibold text-[#1C1C1E]">{sentEmail}</span>.
+                  If it includes a verification code, enter it below.
                 </p>
               </div>
 
               <form onSubmit={verifyCode} className="space-y-3">
                 <input
                   value={token}
-                  onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, 10))}
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder="000000"
-                  maxLength={6}
+                  placeholder="Enter code"
+                  maxLength={10}
                   className="w-full px-4 py-3.5 rounded-2xl text-center font-mono text-2xl font-bold tracking-[0.35em] input-field"
                 />
                 {error && <p className="text-xs text-[#1C1C1E] font-semibold">{error}</p>}
                 <button
                   type="submit"
-                  disabled={verifying || token.length !== 6}
+                  disabled={verifying || token.length < 6}
                   className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform"
                 >
                   {verifying ? 'Verifying...' : 'Verify code'}
@@ -159,7 +156,7 @@ function LoginInner() {
                 disabled={cooldown > 0 || working}
                 className="w-full py-3.5 rounded-2xl text-sm font-semibold bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] disabled:opacity-40"
               >
-                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend link'}
               </button>
               <button
                 onClick={() => { setSent(false); setCooldown(0); setToken(''); setError(''); }}
@@ -189,7 +186,7 @@ function LoginInner() {
                 disabled={working || !email}
                 className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform"
               >
-                {working ? 'Sending code...' : 'Email me a sign-in code'}
+                {working ? 'Sending link...' : 'Email me a sign-in link'}
               </button>
               <p className="text-[11px] text-[#8E8E93] text-center leading-relaxed">
                 Testnet demo only. No real money is involved.
