@@ -108,39 +108,51 @@ export default function Split() {
   // Result screen
   if (result) {
     return (
-      <div className="px-4 pt-6 pb-8">
+      <div className="px-4 pt-4 pb-12 max-w-md mx-auto">
+        <header className="flex items-center justify-between mb-6">
+          <button onClick={() => router.push('/dashboard')} className="w-9 h-9 rounded-full bg-[#F2F2F7] flex items-center justify-center text-[#1C1C1E] text-base hover:bg-[#E5E5EA] transition-colors">
+            ←
+          </button>
+          <span className="text-xl font-bold tracking-tight text-[#1C1C1E]">Migo.</span>
+          <div className="w-9"></div>
+        </header>
+
         <div className="text-center mb-6">
-          <div className="text-4xl mb-2">✅</div>
-          <h2 className="text-xl font-bold text-[#F5F5F7]">Split Created!</h2>
+          <div className="w-14 h-14 bg-[#FFFFFF] border border-[#E5E5EA] rounded-full flex items-center justify-center text-[#1C1C1E] mx-auto mb-3 shadow-sm">
+            <svg className="w-6 h-6 text-[#1C1C1E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-[#1C1C1E]">Split Created!</h2>
           <p className="text-sm text-[#8E8E93] mt-1">
             {result.splitCount} escrows created · {result.totalAmount} {result.currency || 'USD'} total
           </p>
         </div>
 
-        <div className="card rounded-xl p-3 mb-4">
-          <p className="text-sm text-[#8E8E93] text-center">
-            Share each code with the recipient. They&apos;ll see the split in their <strong className="text-[#0A84FF]">Requests → Splits</strong> tab and claim it with the code.
+        <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-4 mb-4">
+          <p className="text-xs text-[#8E8E93] text-center">
+            Share each code with the recipient. They&apos;ll see the split in their <strong className="text-[#1C1C1E]">Requests → Splits</strong> tab and claim it with the code.
           </p>
         </div>
 
         <div className="space-y-3 mb-6">
           {result.splits.map((s, i) => (
-            <div key={i} className="card rounded-xl p-4">
+            <div key={i} className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-3xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <span className="font-semibold text-[#F5F5F7]">@{s.username}</span>
-                  {s.displayName && <span className="text-sm text-[#8E8E93] ml-2">{s.displayName}</span>}
+                  <span className="font-bold text-[#1C1C1E]">@{s.username}</span>
+                  {s.displayName && <span className="text-xs text-[#8E8E93] ml-2">{s.displayName}</span>}
                 </div>
-                <span className="font-bold text-[#F5F5F7]">{s.amount} {result.currency || 'USD'}</span>
+                <span className="font-extrabold text-[#1C1C1E]">{s.amount} {result.currency || 'USD'}</span>
               </div>
-              <div className="card-elevated rounded-lg p-3 flex items-center justify-between">
+              <div className="bg-[#FFFFFF] border border-[#E5E5EA] rounded-2xl p-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-[#8E8E93] mb-0.5">Their claim code</p>
-                  <code className="text-xl font-mono font-bold tracking-[0.25em] text-[#F5F5F7]">{s.code}</code>
+                  <p className="text-[10px] uppercase font-semibold text-[#8E8E93] tracking-wider mb-0.5">Their claim code</p>
+                  <code className="text-xl font-mono font-bold tracking-[0.2em] text-[#1C1C1E]">{s.code}</code>
                 </div>
                 <button
                   onClick={() => navigator.clipboard?.writeText(s.code)}
-                  className="text-xs px-3 py-1.5 rounded-lg font-medium bg-[#0A84FF] text-white"
+                  className="text-xs px-3.5 py-2 rounded-xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] transition-colors"
                 >
                   Copy
                 </button>
@@ -149,13 +161,13 @@ export default function Split() {
           ))}
         </div>
 
-        <p className="text-xs text-[#636366] text-center mb-4">
+        <p className="text-xs text-[#8E8E93] text-center mb-6">
           Unclaimed splits auto-refund to you in 10 minutes.
         </p>
 
         <button
           onClick={() => router.push('/dashboard')}
-          className="w-full py-3 rounded-xl font-semibold bg-[#0A84FF] text-white"
+          className="w-full py-4 rounded-2xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] transition-all"
         >
           Done
         </button>
@@ -164,23 +176,31 @@ export default function Split() {
   }
 
   return (
-    <div className="px-4 pt-6 pb-8">
-      <h2 className="text-xl font-bold text-[#F5F5F7] mb-1">Split Payment</h2>
+    <div className="px-4 pt-4 pb-12 max-w-md mx-auto">
+      <header className="flex items-center justify-between mb-6">
+        <button onClick={() => router.push('/dashboard')} className="w-9 h-9 rounded-full bg-[#F2F2F7] flex items-center justify-center text-[#1C1C1E] text-base hover:bg-[#E5E5EA] transition-colors">
+          ←
+        </button>
+        <span className="text-xl font-bold tracking-tight text-[#1C1C1E]">Migo.</span>
+        <div className="w-9"></div>
+      </header>
+
+      <h2 className="text-2xl font-bold text-[#1C1C1E] mb-1">Split Payment</h2>
       <p className="text-sm text-[#8E8E93] mb-6">
         Split money between multiple people. Each gets a claim code.
       </p>
 
       {/* Split mode toggle */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 p-1 bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl mb-6">
         <button
           onClick={() => setSplitMode('equal')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${splitMode === 'equal' ? 'bg-[#0A84FF] text-white' : 'card text-[#8E8E93]'}`}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${splitMode === 'equal' ? 'bg-[#000000] text-white shadow-sm' : 'text-[#8E8E93] hover:text-[#1C1C1E]'}`}
         >
           Equal Split
         </button>
         <button
           onClick={() => setSplitMode('custom')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${splitMode === 'custom' ? 'bg-[#0A84FF] text-white' : 'card text-[#8E8E93]'}`}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${splitMode === 'custom' ? 'bg-[#000000] text-white shadow-sm' : 'text-[#8E8E93] hover:text-[#1C1C1E]'}`}
         >
           Custom Amounts
         </button>
@@ -191,21 +211,21 @@ export default function Split() {
         <div className="mb-5">
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="text-sm text-[#8E8E93] mb-1 block">Total Amount</label>
+              <label className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-2 block">Total Amount</label>
               <input
                 type="number"
                 value={totalAmount}
                 onChange={(e) => setTotalAmount(e.target.value)}
                 placeholder="100"
-                className="input-field w-full px-4 py-3 rounded-xl text-lg"
+                className="w-full px-4 py-3.5 rounded-2xl text-lg font-semibold bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000] transition-colors"
               />
             </div>
             <div>
-              <label className="text-sm text-[#8E8E93] mb-1 block">Currency</label>
+              <label className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-2 block">Currency</label>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="input-field w-full px-4 py-3 rounded-xl text-lg"
+                className="w-full px-3 py-3.5 rounded-2xl text-lg font-semibold bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000] transition-colors"
               >
                 <option value="USD">USD</option>
                 <option value="INR">INR</option>
@@ -215,7 +235,7 @@ export default function Split() {
             </div>
           </div>
           {equalAmount && recipients.length > 0 && (
-            <p className="text-xs text-[#636366] mt-1">
+            <p className="text-xs text-[#8E8E93] mt-2">
               = {equalAmount} {currency} each × {recipients.length} {recipients.length === 1 ? 'person' : 'people'}
             </p>
           )}
@@ -225,11 +245,11 @@ export default function Split() {
       {/* Currency selector for custom mode */}
       {splitMode === 'custom' && (
         <div className="mb-5">
-          <label className="text-sm text-[#8E8E93] mb-1 block">Currency</label>
+          <label className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-2 block">Currency</label>
           <select
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
-            className="input-field w-full px-4 py-3 rounded-xl"
+            className="w-full px-4 py-3.5 rounded-2xl font-semibold bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000] transition-colors"
           >
             <option value="USD">USD</option>
             <option value="INR">INR</option>
@@ -241,19 +261,19 @@ export default function Split() {
 
       {/* Recipients */}
       <div className="space-y-3 mb-4">
-        <label className="text-sm text-[#8E8E93] block">Recipients</label>
+        <label className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider block">Recipients</label>
         {recipients.map((r, i) => (
-          <div key={i} className="card rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
+          <div key={i} className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-3.5 shadow-sm">
+            <div className="flex items-center gap-2 mb-1.5">
               <div className="flex-1 relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#636366] text-sm">@</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8E8E93] text-sm">@</span>
                 <input
                   value={r.username}
                   onChange={(e) => updateRecipient(i, 'username', e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
                   onBlur={() => lookupUser(i)}
                   onKeyDown={(e) => e.key === 'Enter' && lookupUser(i)}
                   placeholder="username"
-                  className="input-field w-full pl-8 pr-3 py-2 rounded-lg text-sm"
+                  className="w-full pl-8 pr-3 py-2.5 rounded-xl text-sm bg-white border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000]"
                 />
               </div>
               {splitMode === 'custom' && (
@@ -262,30 +282,30 @@ export default function Split() {
                   value={r.amount}
                   onChange={(e) => updateRecipient(i, 'amount', e.target.value)}
                   placeholder={currency}
-                  className="input-field w-24 px-3 py-2 rounded-lg text-sm"
+                  className="w-24 px-3 py-2.5 rounded-xl text-sm bg-white border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000]"
                 />
               )}
               {recipients.length > 1 && (
-                <button onClick={() => removeRecipient(i)} className="text-[#636366] hover:text-[#FF453A] text-lg px-1">×</button>
+                <button onClick={() => removeRecipient(i)} className="text-[#8E8E93] hover:text-[#1C1C1E] text-xl px-1.5">×</button>
               )}
             </div>
 
             {/* Status */}
             {lookingUp[i] && (
-              <p className="text-xs text-[#636366] animate-pulse">Looking up...</p>
+              <p className="text-xs text-[#8E8E93] animate-pulse">Looking up...</p>
             )}
             {r.resolved && (
-              <div className="flex items-center gap-2 text-xs text-[#30D158]">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1C1C1E]">
                 <span>✓</span>
                 <span>{r.resolved.displayName || r.resolved.username}</span>
-                <span className="text-[#636366]">·</span>
-                <span className="text-[#636366] font-mono">{r.resolved.address.slice(0, 8)}...</span>
-                <span className="text-[#636366]">·</span>
-                <span className="text-[#636366]">{r.resolved.baseCurrency}</span>
+                <span className="text-[#8E8E93]">·</span>
+                <span className="text-[#8E8E93] font-mono">{r.resolved.address.slice(0, 8)}...</span>
+                <span className="text-[#8E8E93]">·</span>
+                <span className="text-[#8E8E93]">{r.resolved.baseCurrency}</span>
               </div>
             )}
             {r.error && (
-              <p className="text-xs text-[#FF453A]">{r.error}</p>
+              <p className="text-xs text-[#1C1C1E] font-semibold">{r.error}</p>
             )}
           </div>
         ))}
@@ -294,38 +314,38 @@ export default function Split() {
       <button
         onClick={addRecipient}
         disabled={recipients.length >= 10}
-        className="w-full py-2 border-2 border-dashed border-[#2C2C2E] rounded-xl text-sm font-medium mb-5 disabled:opacity-30 text-[#8E8E93]"
+        className="w-full py-3 border border-dashed border-[#E5E5EA] bg-[#F2F2F7] rounded-2xl text-xs font-semibold mb-6 disabled:opacity-40 text-[#1C1C1E] hover:bg-[#E5E5EA] transition-colors"
       >
         + Add Recipient {recipients.length >= 10 && '(max 10)'}
       </button>
 
       {/* Summary */}
       {parseFloat(computedTotal) > 0 && allResolved && (
-        <div className="card rounded-xl p-4 mb-5">
-          <div className="flex justify-between text-sm mb-1">
+        <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-3xl p-5 mb-6 shadow-sm">
+          <div className="flex justify-between text-sm mb-2">
             <span className="text-[#8E8E93]">Total</span>
-            <span className="font-bold text-[#F5F5F7]">{computedTotal} {currency}</span>
+            <span className="font-extrabold text-[#1C1C1E]">{computedTotal} {currency}</span>
           </div>
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-sm mb-2">
             <span className="text-[#8E8E93]">Recipients</span>
-            <span className="text-[#F5F5F7]">{recipients.length}</span>
+            <span className="font-semibold text-[#1C1C1E]">{recipients.length}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-[#8E8E93]">Each gets</span>
-            <span className="text-[#F5F5F7]">{splitMode === 'equal' ? equalAmount : 'Custom'} {currency}</span>
+            <span className="font-semibold text-[#1C1C1E]">{splitMode === 'equal' ? equalAmount : 'Custom'} {currency}</span>
           </div>
-          <p className="text-xs text-[#636366] mt-2">
+          <p className="text-xs text-[#8E8E93] mt-3 pt-3 border-t border-[#E5E5EA]">
             Each person gets a 6-digit claim code. Unclaimed funds auto-refund in 10 min.
           </p>
         </div>
       )}
 
-      {error && <p className="text-[#FF453A] text-sm mb-3">{error}</p>}
+      {error && <p className="text-[#1C1C1E] font-semibold text-sm bg-[#F2F2F7] border border-[#E5E5EA] p-3 rounded-xl mb-4">{error}</p>}
 
       <button
         onClick={handleSplit}
         disabled={!canSend}
-        className="w-full py-4 rounded-2xl font-semibold bg-[#0A84FF] text-white disabled:opacity-50"
+        className="w-full py-4 rounded-2xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] disabled:opacity-40 transition-all shadow-sm"
       >
         {sending ? 'Creating escrows...' : `Split ${computedTotal || '0'} ${currency}`}
       </button>

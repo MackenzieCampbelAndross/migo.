@@ -13,16 +13,16 @@ function TransferPopup({ transfer, position }) {
     <div
       className={`absolute ${position} animate-fade-in-out pointer-events-none z-20`}
     >
-      <div className="bg-[#1C1C1E]/90 border border-[#2C2C2E] rounded-xl px-3 py-2 max-w-[170px]">
+      <div className="bg-[#FFFFFF]/95 border border-[#E5E5EA] rounded-2xl px-3.5 py-2.5 max-w-[170px] shadow-sm">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#0A84FF]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[#000000]" />
           <span className="text-[10px] text-[#8E8E93] truncate">{transfer.from}</span>
-          <span className="text-[10px] text-[#636366]">→</span>
+          <span className="text-[10px] text-[#A1A1A6]">→</span>
           <span className="text-[10px] text-[#8E8E93] truncate">{transfer.to}</span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-xs font-bold text-[#F5F5F7]">{transfer.amt}</span>
-          <span className="text-[9px] text-[#30D158] ml-2">{transfer.cur}</span>
+          <span className="text-xs font-bold text-[#1C1C1E]">{transfer.amt}</span>
+          <span className="text-[9px] text-[#636366] font-medium ml-2">{transfer.cur}</span>
         </div>
       </div>
     </div>
@@ -120,8 +120,8 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#161618]">
-        <div className="w-10 h-10 border-3 border-[#2C2C2E] border-t-[#0A84FF] rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-[#F8F8FA]">
+        <div className="w-10 h-10 border-3 border-[#E5E5EA] border-t-[#000000] rounded-full animate-spin" />
       </div>
     );
   }
@@ -129,26 +129,31 @@ export default function Home() {
   // Seed backup screen
   if (createdSeed) {
     return (
-      <div className="min-h-screen bg-[#161618] px-6 pt-16 max-w-md mx-auto">
+      <div className="min-h-screen bg-[#F8F8FA] px-6 pt-16 max-w-md mx-auto">
         <div className="text-center mb-8">
-          <div className="text-4xl mb-3">🔐</div>
-          <h2 className="text-xl font-bold text-[#F5F5F7]">Save Your Wallet Seed</h2>
+          <div className="w-14 h-14 bg-[#FFFFFF] border border-[#E5E5EA] rounded-full flex items-center justify-center text-[#1C1C1E] mx-auto mb-3 shadow-sm">
+            <svg className="w-6 h-6 text-[#1C1C1E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0v4" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-[#1C1C1E]">Save Your Wallet Seed</h2>
           <p className="text-sm text-[#8E8E93] mt-2">
             This is the ONLY way to recover your wallet. Save it somewhere safe.
           </p>
         </div>
-        <div className="card rounded-xl p-4 mb-6">
-          <code className="text-sm text-[#0A84FF] break-all select-all font-mono">{createdSeed}</code>
+        <div className="card rounded-2xl p-4 mb-6 bg-[#F2F2F7]">
+          <code className="text-sm text-[#000000] break-all select-all font-mono font-semibold">{createdSeed}</code>
         </div>
         <button
           onClick={() => { navigator.clipboard?.writeText(createdSeed); }}
-          className="w-full py-3 card text-[#8E8E93] rounded-xl text-sm font-medium mb-3"
+          className="w-full py-3 card text-[#1C1C1E] rounded-2xl text-sm font-medium mb-3"
         >
           Copy to Clipboard
         </button>
         <button
           onClick={() => router.push('/dashboard')}
-          className="w-full py-3 bg-[#0A84FF] text-white rounded-xl font-bold active:opacity-90"
+          className="w-full py-3.5 bg-[#000000] text-white rounded-2xl font-bold active:opacity-90"
         >
           I Saved It — Continue
         </button>
@@ -157,13 +162,13 @@ export default function Home() {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#161618] flex flex-col">
-      {/* Title — clean, no globe behind */}
+    <div className="fixed inset-0 bg-[#F8F8FA] flex flex-col">
+      {/* Title — clean Migo. branding */}
       <div className="text-center pt-12 pb-3 flex-shrink-0 relative z-10">
-        <h1 className="text-4xl font-bold">
-          <span className="text-[#F5F5F7]">Xen</span><span className="text-[#0A84FF]">mo</span>
+        <h1 className="text-4xl font-extrabold text-[#1C1C1E] tracking-tight">
+          Migo.
         </h1>
-        <p className="text-[#8E8E93] text-sm mt-1">Send money anywhere. Instantly.</p>
+        <p className="text-[#8E8E93] text-sm mt-1 font-medium">Send money anywhere. Instantly.</p>
       </div>
 
       {/* Globe — fills middle space, interactive */}
@@ -182,17 +187,17 @@ export default function Home() {
           <div className="space-y-3">
             <button
               onClick={() => setMode('create')}
-              className="w-full py-3.5 bg-[#0A84FF] text-white rounded-xl font-bold text-base active:scale-[0.98] transition-transform"
+              className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold text-base active:scale-[0.98] transition-transform shadow-sm"
             >
               Create New Wallet
             </button>
             <button
               onClick={() => setMode('import')}
-              className="w-full py-3.5 card text-[#F5F5F7] rounded-xl font-semibold text-base active:opacity-80 transition-colors"
+              className="w-full py-4 card text-[#1C1C1E] rounded-2xl font-semibold text-base active:opacity-80 transition-colors"
             >
               I Have a Wallet
             </button>
-            <p className="text-center text-[10px] text-[#636366] mt-3">
+            <p className="text-center text-[11px] text-[#8E8E93] mt-3 font-medium">
               Powered by the XRP Ledger
             </p>
           </div>
@@ -201,17 +206,17 @@ export default function Home() {
         {/* Create form */}
         {mode === 'create' && (
           <div className="space-y-3">
-            <button onClick={() => setMode(null)} className="text-sm text-[#0A84FF] mb-1">← Back</button>
+            <button onClick={() => setMode(null)} className="text-sm font-semibold text-[#1C1C1E] mb-1">← Back</button>
             <div>
-              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider">Username</label>
+              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Username</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#636366]">@</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]">@</span>
                 <input
                   value={username}
                   onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))}
                   placeholder="jayp"
                   maxLength={20}
-                  className="input-field w-full pl-8 pr-4 py-2.5 rounded-lg text-sm"
+                  className="input-field w-full pl-9 pr-4 py-3 rounded-2xl text-sm"
                 />
               </div>
             </div>
@@ -219,14 +224,14 @@ export default function Home() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name (optional)"
-              className="input-field w-full px-3 py-2.5 rounded-lg text-sm"
+              className="input-field w-full px-4 py-3 rounded-2xl text-sm"
             />
             <div>
-              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider">Currency</label>
+              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Currency</label>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="input-field w-full px-3 py-2.5 rounded-lg text-sm"
+                className="input-field w-full px-4 py-3 rounded-2xl text-sm"
               >
                 <option value="USD">USD — US Dollar</option>
                 <option value="INR">INR — Indian Rupee</option>
@@ -234,11 +239,11 @@ export default function Home() {
                 <option value="NGN">NGN — Nigerian Naira</option>
               </select>
             </div>
-            {error && <p className="text-[#FF453A] text-sm">{error}</p>}
+            {error && <p className="text-[#1C1C1E] text-sm font-semibold">{error}</p>}
             <button
               onClick={handleCreate}
               disabled={working || !username || username.length < 3}
-              className="w-full py-3 bg-[#0A84FF] text-white rounded-xl font-bold disabled:opacity-40 active:scale-[0.98] transition-transform"
+              className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform"
             >
               {working ? 'Creating wallet (30-60s)...' : 'Create Wallet'}
             </button>
@@ -248,44 +253,44 @@ export default function Home() {
         {/* Import form */}
         {mode === 'import' && (
           <div className="space-y-3">
-            <button onClick={() => setMode(null)} className="text-sm text-[#0A84FF] mb-1">← Back</button>
+            <button onClick={() => setMode(null)} className="text-sm font-semibold text-[#1C1C1E] mb-1">← Back</button>
             <div>
-              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider">Wallet Seed</label>
+              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Wallet Seed</label>
               <input
                 value={seed}
                 onChange={(e) => setSeed(e.target.value)}
                 placeholder="sEdXXXXXXXXXXXXXXXX..."
-                className="input-field w-full px-3 py-2.5 rounded-lg font-mono text-sm"
+                className="input-field w-full px-4 py-3 rounded-2xl font-mono text-sm"
               />
             </div>
             <div>
-              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider">Username (if first time)</label>
+              <label className="text-xs text-[#8E8E93] mb-1 block uppercase tracking-wider font-semibold">Username (if first time)</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#636366]">@</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8E8E93]">@</span>
                 <input
                   value={username}
                   onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20))}
                   placeholder="jayp"
                   maxLength={20}
-                  className="input-field w-full pl-8 pr-4 py-2.5 rounded-lg text-sm"
+                  className="input-field w-full pl-9 pr-4 py-3 rounded-2xl text-sm"
                 />
               </div>
             </div>
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="input-field w-full px-3 py-2.5 rounded-lg text-sm"
+              className="input-field w-full px-4 py-3 rounded-2xl text-sm"
             >
               <option value="USD">USD — US Dollar</option>
               <option value="INR">INR — Indian Rupee</option>
               <option value="EUR">EUR — Euro</option>
               <option value="NGN">NGN — Nigerian Naira</option>
             </select>
-            {error && <p className="text-[#FF453A] text-sm">{error}</p>}
+            {error && <p className="text-[#1C1C1E] text-sm font-semibold">{error}</p>}
             <button
               onClick={handleImport}
               disabled={working || !seed}
-              className="w-full py-3 bg-[#0A84FF] text-white rounded-xl font-bold disabled:opacity-40 active:scale-[0.98] transition-transform"
+              className="w-full py-4 bg-[#000000] text-white rounded-2xl font-semibold disabled:opacity-40 active:scale-[0.98] transition-transform"
             >
               {working ? 'Importing...' : 'Import Wallet'}
             </button>
@@ -295,3 +300,4 @@ export default function Home() {
     </div>
   );
 }
+

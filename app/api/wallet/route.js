@@ -58,7 +58,12 @@ export async function PUT(req) {
     const { data: existingUser } = await supabase.from('users').select('*').eq('wallet_address', wallet.address).single();
 
     if (existingUser) {
-      return NextResponse.json({ success: true, address: wallet.address, username: existingUser.username });
+      return NextResponse.json({
+        success: true,
+        address: wallet.address,
+        username: existingUser.username,
+        baseCurrency: existingUser.base_currency,
+      });
     }
 
     // New import — require username
@@ -79,7 +84,7 @@ export async function PUT(req) {
       base_currency: baseCurrency || 'USD',
     });
 
-    return NextResponse.json({ success: true, address: wallet.address, username: username.toLowerCase() });
+    return NextResponse.json({ success: true, address: wallet.address, username: username.toLowerCase(), baseCurrency: baseCurrency || 'USD' });
   } catch (err) {
     console.error('Wallet import failed:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -93,7 +98,11 @@ export async function GET(req) {
     if (!address) return NextResponse.json({ error: 'Address required' }, { status: 400 });
 
     const balances = await getBalances(address);
-    return NextResponse.json({ success: true, balances });
+    return NextResponse.json({ success: true, balances }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

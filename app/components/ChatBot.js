@@ -7,7 +7,7 @@ export default function ChatBot() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'bot', text: 'Hi! I\'m Xenmo Assistant. Ask me anything about sending money internationally.' },
+    { role: 'bot', text: 'Hi! I\'m Migo Assistant. Ask me anything about sending money internationally.' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,25 +41,33 @@ export default function ChatBot() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full flex items-center justify-center text-xl transition-colors"
-        style={{ background: '#0A84FF', color: '#fff' }}
+        className="fixed bottom-20 right-4 z-50 w-11 h-11 rounded-full flex items-center justify-center transition-transform active:scale-95 shadow-md bg-[#000000] text-white"
+        aria-label="Open Assistant"
       >
-        {open ? '✕' : '💬'}
+        {open ? (
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        )}
       </button>
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-36 right-4 left-4 sm:left-auto z-50 sm:w-80 h-[28rem] max-h-[70vh] rounded-2xl flex flex-col overflow-hidden card" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-          <div className="px-4 py-3 text-sm font-semibold text-[#F5F5F7]" style={{ background: '#2C2C2E', borderBottom: '1px solid #3A3A3C' }}>
-            Xenmo Assistant
+        <div className="fixed bottom-32 right-3 left-3 z-50 h-[26rem] max-h-[65vh] rounded-3xl flex flex-col overflow-hidden bg-[#FFFFFF] border border-[#E5E5EA] shadow-xl">
+          <div className="px-4 py-3 text-sm font-semibold text-[#1C1C1E] bg-[#F8F8FA] border-b border-[#E5E5EA]">
+            Migo Assistant
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {messages.map((m, i) => (
               <div key={i} className={`text-sm ${m.role === 'user' ? 'text-right' : ''}`}>
-                <span className={`inline-block px-3 py-2 rounded-xl max-w-[85%] ${
+                <span className={`inline-block px-3.5 py-2.5 rounded-2xl max-w-[85%] ${
                   m.role === 'user'
-                    ? 'bg-[#0A84FF] text-white'
-                    : 'bg-[#2C2C2E] text-[#F5F5F7]'
+                    ? 'bg-[#000000] text-white'
+                    : 'bg-[#F2F2F7] text-[#1C1C1E]'
                 }`}>
                   {m.text}
                 </span>
@@ -69,18 +77,18 @@ export default function ChatBot() {
               <div className="text-sm text-[#8E8E93] animate-pulse">Thinking...</div>
             )}
           </div>
-          <div className="p-2 flex gap-2" style={{ borderTop: '1px solid #2C2C2E' }}>
+          <div className="p-2.5 flex gap-2 border-t border-[#E5E5EA] bg-[#F8F8FA]">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
               placeholder="Ask anything..."
-              className="flex-1 px-3 py-2 rounded-lg text-sm input-field"
+              className="flex-1 px-3.5 py-2 rounded-xl text-sm input-field"
             />
             <button
               onClick={send}
               disabled={loading}
-              className="px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 bg-[#0A84FF] text-white"
+              className="px-3.5 py-2 rounded-xl text-sm font-medium disabled:opacity-50 bg-[#000000] text-white"
             >
               Send
             </button>

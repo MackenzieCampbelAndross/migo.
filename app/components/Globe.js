@@ -74,12 +74,12 @@ const DEMO_ROUTES = [
 ];
 
 const C = {
-  base: 0x161618, fill: 0x1c1c1e, border: 0x0a84ff,
-  atmo: 0x0a84ff, grid: 0x2c2c2e,
-  node: 0x3388cc, nodeGlow: 0x55aaee,
-  arcCyan: 0x0a84ff, arcOrange: 0xff9f0a,
-  trailHead: 0xf5f5f7, trailMid: 0x0a84ff, trailTail: 0x063d7a,
-  pulse: 0x0a84ff, particle: 0x0a84ff,
+  base: 0xF2F2F7, fill: 0xE5E5EA, border: 0x8E8E93,
+  atmo: 0xD1D1D6, grid: 0xE5E5EA,
+  node: 0x636366, nodeGlow: 0x8E8E93,
+  arcCyan: 0x000000, arcOrange: 0x3A3A3C,
+  trailHead: 0x000000, trailMid: 0x636366, trailTail: 0xC7C7CC,
+  pulse: 0x000000, particle: 0x000000,
 };
 
 function ll2v(lat, lng, r = 1.005) {

@@ -76,21 +76,29 @@ export default function Scan() {
   }
 
   return (
-    <div className="px-4 pt-6">
-      <h2 className="text-xl font-bold text-[#F5F5F7] mb-4">Scan QR Code</h2>
-      <p className="text-sm text-[#8E8E93] mb-4">Point your camera at the recipient&apos;s QR code.</p>
+    <div className="px-4 pt-4 pb-12 max-w-md mx-auto">
+      <header className="flex items-center justify-between mb-6">
+        <button onClick={() => router.push('/dashboard')} className="w-9 h-9 rounded-full bg-[#F2F2F7] flex items-center justify-center text-[#1C1C1E] text-base hover:bg-[#E5E5EA] transition-colors">
+          ←
+        </button>
+        <span className="text-xl font-bold tracking-tight text-[#1C1C1E]">Migo.</span>
+        <div className="w-9"></div>
+      </header>
 
-      <div className="rounded-2xl overflow-hidden mb-4 card" style={{ minHeight: 'min(300px, 50vh)' }}>
+      <h2 className="text-2xl font-bold text-[#1C1C1E] mb-1">Scan QR Code</h2>
+      <p className="text-sm text-[#8E8E93] mb-6">Point your camera at the recipient&apos;s QR code.</p>
+
+      <div className="rounded-3xl overflow-hidden mb-6 bg-[#F2F2F7] border border-[#E5E5EA] shadow-sm" style={{ minHeight: 'min(300px, 50vh)' }}>
         <div id="qr-reader" />
       </div>
 
       {error && (
-        <div className="text-[#FF453A] text-sm p-3 rounded-xl mb-4 card">{error}</div>
+        <div className="text-[#1C1C1E] text-sm font-semibold p-4 rounded-2xl mb-4 bg-[#F2F2F7] border border-[#E5E5EA]">{error}</div>
       )}
 
       <button
         onClick={() => router.push('/send')}
-        className="w-full py-3 rounded-xl text-sm font-medium text-[#8E8E93] card"
+        className="w-full py-4 rounded-2xl text-sm font-semibold text-[#1C1C1E] bg-[#F2F2F7] border border-[#E5E5EA] hover:bg-[#E5E5EA] transition-colors"
       >
         Enter address manually instead
       </button>
