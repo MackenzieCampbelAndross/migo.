@@ -21,15 +21,15 @@ export default function RootLayout({ children }) {
     <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-        <meta name="theme-color" content="#F5F5F7" />
+        <meta name="theme-color" content="#0D1017" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/ambassador.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="min-h-full bg-[#F5F5F7] text-[#1C1C1E] antialiased">
+      <body className="min-h-full bg-[#0D1017] text-[#FFFFFF] antialiased">
         <WalletProvider>
           <main className="pb-20">
             {children}

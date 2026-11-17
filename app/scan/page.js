@@ -69,39 +69,34 @@ export default function Scan() {
 
   if (scannedAddress) {
     return (
-      <div className="flex items-center justify-center h-screen text-[#8E8E93]">
+      <div className="flex items-center justify-center h-screen bg-[#0D1017] text-[#94A3B8]">
         Opening send...
       </div>
     );
   }
 
   return (
-    <div className="px-4 pt-4 pb-12 max-w-md mx-auto">
+    <div className="px-5 pt-6 pb-12 max-w-md mx-auto min-h-screen bg-[#0D1017] text-white">
       <header className="flex items-center justify-between mb-6">
-        <button onClick={() => router.push('/dashboard')} className="w-9 h-9 rounded-full bg-[#F2F2F7] flex items-center justify-center text-[#1C1C1E] text-base hover:bg-[#E5E5EA] transition-colors">
-          ←
+        <button onClick={() => router.push('/dashboard')} className="w-10 h-10 rounded-full bg-[#161B26] border border-[#262E3D] flex items-center justify-center text-white text-base hover:bg-[#1E2430] transition-colors">
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
         </button>
-        <span className="text-xl font-bold tracking-tight text-[#1C1C1E]">Migo.</span>
-        <div className="w-9"></div>
+        <span className="text-xl font-bold tracking-tight text-white font-display">migo.</span>
+        <div className="w-10"></div>
       </header>
 
-      <h2 className="text-2xl font-bold text-[#1C1C1E] mb-1">Scan QR Code</h2>
-      <p className="text-sm text-[#8E8E93] mb-6">Point your camera at the recipient&apos;s QR code.</p>
+      <h2 className="text-2xl font-bold text-white mb-1">Scan QR Code</h2>
+      <p className="text-sm text-[#94A3B8] mb-6">Point your camera at the recipient&apos;s QR code.</p>
 
-      <div className="rounded-3xl overflow-hidden mb-6 bg-[#F2F2F7] border border-[#E5E5EA] shadow-sm" style={{ minHeight: 'min(300px, 50vh)' }}>
+      <div className="rounded-3xl overflow-hidden mb-6 bg-[#161B26] border border-[#262E3D] shadow-sm" style={{ minHeight: 'min(300px, 50vh)' }}>
         <div id="qr-reader" />
       </div>
 
       {error && (
-        <div className="text-[#1C1C1E] text-sm font-semibold p-4 rounded-2xl mb-4 bg-[#F2F2F7] border border-[#E5E5EA]">{error}</div>
+        <div className="text-red-400 text-sm font-semibold p-4 rounded-2xl mb-4 bg-red-950/40 border border-red-900/40">{error}</div>
       )}
-
-      <button
-        onClick={() => router.push('/send')}
-        className="w-full py-4 rounded-2xl text-sm font-semibold text-[#1C1C1E] bg-[#F2F2F7] border border-[#E5E5EA] hover:bg-[#E5E5EA] transition-colors"
-      >
-        Enter address manually instead
-      </button>
     </div>
   );
 }

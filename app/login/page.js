@@ -1,5 +1,5 @@
-import OnboardingFlow from '../components/OnboardingFlow';
+import UnifiedOnboarding from '../components/UnifiedOnboarding';
 
 export default function Login() {
-  return <OnboardingFlow entry="email" />;
+  return <UnifiedOnboarding />;
 }

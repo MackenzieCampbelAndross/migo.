@@ -116,29 +116,31 @@ export default function Split() {
   // Result screen
   if (result) {
     return (
-      <div className="px-4 pt-4 pb-12 max-w-md mx-auto">
+      <div className="px-5 pt-6 pb-12 max-w-md mx-auto min-h-screen bg-[#120A1F] text-white">
         <header className="flex items-center justify-between mb-6">
-          <button onClick={() => router.push('/dashboard')} className="w-9 h-9 rounded-full bg-[#F2F2F7] flex items-center justify-center text-[#1C1C1E] text-base hover:bg-[#E5E5EA] transition-colors">
-            ←
+          <button onClick={() => router.push('/dashboard')} className="w-10 h-10 rounded-full bg-[#1B122C] border border-[#2C2042] flex items-center justify-center text-white text-base hover:bg-[#251A3D] transition-colors">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
-          <span className="text-xl font-bold tracking-tight text-[#1C1C1E]">Migo.</span>
-          <div className="w-9"></div>
+          <span className="text-xl font-bold tracking-tight text-white font-display">Migo.</span>
+          <div className="w-10"></div>
         </header>
 
         <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-[#FFFFFF] border border-[#E5E5EA] rounded-full flex items-center justify-center text-[#1C1C1E] mx-auto mb-3 shadow-sm">
-            <svg className="w-6 h-6 text-[#1C1C1E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+          <div className="w-14 h-14 bg-emerald-950/40 border border-emerald-800/40 rounded-full flex items-center justify-center text-emerald-400 mx-auto mb-3 shadow-sm">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-[#1C1C1E]">Split Created!</h2>
-          <p className="text-sm text-[#8E8E93] mt-1">
+          <h2 className="text-xl font-bold text-white">Split Created!</h2>
+          <p className="text-sm text-[#A79BBF] mt-1">
             {result.splitCount} escrows created · {result.totalAmount} {result.currency || 'USD'} total
           </p>
         </div>
 
-        <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-4 mb-4">
-          <p className="text-xs text-[#8E8E93] text-center">
+        <div className="bg-[#1B122C] border border-[#2C2042] rounded-2xl p-4 mb-4">
+          <p className="text-xs text-[#A79BBF] text-center">
             {result.codesUnavailable
               ? 'This split was already created. Claim codes are shown only once; unclaimed splits can be refunded from history after expiry.'
               : 'Share each code with its recipient. They can also see the split in Requests → Claims and claim it with the code.'}
@@ -147,23 +149,23 @@ export default function Split() {
 
         <div className="space-y-3 mb-6">
           {result.splits.map((s, i) => (
-            <div key={i} className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-3xl p-5 shadow-sm">
+            <div key={i} className="bg-[#1B122C] border border-[#2C2042] rounded-3xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <span className="font-bold text-[#1C1C1E]">{s.username ? `@${s.username}` : 'Recipient'}</span>
-                  {s.displayName && <span className="text-xs text-[#8E8E93] ml-2">{s.displayName}</span>}
+                  <span className="font-bold text-white">{s.username ? `@${s.username}` : 'Recipient'}</span>
+                  {s.displayName && <span className="text-xs text-[#A79BBF] ml-2">{s.displayName}</span>}
                 </div>
-                <span className="font-extrabold text-[#1C1C1E]">{s.amount} {result.currency || 'USD'}</span>
+                <span className="font-extrabold text-white">{s.amount} {result.currency || 'USD'}</span>
               </div>
               {s.code && (
-                <div className="bg-[#FFFFFF] border border-[#E5E5EA] rounded-2xl p-3 flex items-center justify-between">
+                <div className="bg-[#140C24] border border-[#261A3D] rounded-2xl p-3 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] uppercase font-semibold text-[#8E8E93] tracking-wider mb-0.5">Their claim code</p>
-                    <code className="text-base font-mono font-bold tracking-wider text-[#1C1C1E] break-all">{s.code}</code>
+                    <p className="text-[10px] uppercase font-semibold text-[#A79BBF] tracking-wider mb-0.5">Their claim code</p>
+                    <code className="text-base font-mono font-bold tracking-wider text-emerald-400 break-all">{s.code}</code>
                   </div>
                   <button
                     onClick={() => navigator.clipboard?.writeText(s.code)}
-                    className="text-xs px-3.5 py-2 rounded-xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] transition-colors"
+                    className="text-xs px-3.5 py-2 rounded-xl font-semibold bg-[#7C3AED] text-white hover:bg-[#6D28D9] transition-colors"
                   >
                     Copy
                   </button>
@@ -184,7 +186,7 @@ export default function Split() {
 
         <button
           onClick={() => router.push('/dashboard')}
-          className="w-full py-4 rounded-2xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] transition-all"
+          className="w-full py-4 rounded-2xl font-semibold bg-[#7C3AED] hover:bg-[#6D28D9] text-white transition-all"
         >
           Done
         </button>
@@ -193,31 +195,33 @@ export default function Split() {
   }
 
   return (
-    <div className="px-4 pt-4 pb-12 max-w-md mx-auto">
+    <div className="px-5 pt-6 pb-12 max-w-md mx-auto min-h-screen bg-[#120A1F] text-white">
       <header className="flex items-center justify-between mb-6">
-        <button onClick={() => router.push('/dashboard')} className="w-9 h-9 rounded-full bg-[#F2F2F7] flex items-center justify-center text-[#1C1C1E] text-base hover:bg-[#E5E5EA] transition-colors">
-          ←
+        <button onClick={() => router.push('/dashboard')} className="w-10 h-10 rounded-full bg-[#1B122C] border border-[#2C2042] flex items-center justify-center text-white text-base hover:bg-[#251A3D] transition-colors">
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
         </button>
-        <span className="text-xl font-bold tracking-tight text-[#1C1C1E]">Migo.</span>
-        <div className="w-9"></div>
+        <span className="text-xl font-bold tracking-tight text-white font-display">Migo.</span>
+        <div className="w-10"></div>
       </header>
 
-      <h2 className="text-2xl font-bold text-[#1C1C1E] mb-1">Split Payment</h2>
-      <p className="text-sm text-[#8E8E93] mb-6">
+      <h2 className="text-2xl font-bold text-white mb-1">Split Payment</h2>
+      <p className="text-sm text-[#A79BBF] mb-6">
         Split money between multiple people. Each gets a claim code.
       </p>
 
       {/* Split mode toggle */}
-      <div className="flex gap-2 p-1 bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl mb-6">
+      <div className="flex gap-2 p-1 bg-[#1B122C] border border-[#2C2042] rounded-2xl mb-6">
         <button
           onClick={() => setSplitMode('equal')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${splitMode === 'equal' ? 'bg-[#000000] text-white shadow-sm' : 'text-[#8E8E93] hover:text-[#1C1C1E]'}`}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${splitMode === 'equal' ? 'bg-[#7C3AED] text-white shadow-sm' : 'text-[#A79BBF] hover:text-white'}`}
         >
           Equal Split
         </button>
         <button
           onClick={() => setSplitMode('custom')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${splitMode === 'custom' ? 'bg-[#000000] text-white shadow-sm' : 'text-[#8E8E93] hover:text-[#1C1C1E]'}`}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${splitMode === 'custom' ? 'bg-[#7C3AED] text-white shadow-sm' : 'text-[#A79BBF] hover:text-white'}`}
         >
           Custom Amounts
         </button>

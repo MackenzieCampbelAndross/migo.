@@ -54,8 +54,8 @@ const tabs = [
 export default function Nav() {
   const pathname = usePathname();
 
-  // Hide nav on public auth screens
-  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/auth')) return null;
+  // Hide nav on public auth screens and dashboard (dashboard has its own floating pill nav matching Figma)
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/auth') || pathname === '/dashboard') return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 safe-bottom bg-[#FFFFFF]/90 backdrop-blur-xl border-t border-[#E5E5EA]">
