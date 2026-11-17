@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '../components/WalletProvider';
+import { apiFetch } from '@/lib/client-api';
+import { normalizeClaimCode } from '@/lib/claim-code-format';
 
 export default function Request() {
   const { wallet } = useWallet();
@@ -29,19 +31,17 @@ export default function Request() {
   const fetchRequests = useCallback(async () => {
     if (!wallet) return;
     try {
-      const res = await fetch(`/api/request?address=${wallet.address}`);
-      const data = await res.json();
+      const data = await apiFetch('/api/request');
       if (data.success) setRequests(data.requests);
-    } catch (e) { /* ignore */ }
+    } catch { /* handled by the page state */ }
   }, [wallet]);
 
   const fetchSplits = useCallback(async () => {
     if (!wallet) return;
     try {
-      const res = await fetch(`/api/escrow?address=${wallet.address}`);
-      const data = await res.json();
+      const data = await apiFetch('/api/escrow');
       if (data.success) setPendingEscrows(data.escrows);
-    } catch (e) { /* ignore */ }
+    } catch { /* handled by the page state */ }
   }, [wallet]);
 
   useEffect(() => {
@@ -54,64 +54,48 @@ export default function Request() {
     setSending(true);
     setError('');
     try {
-      const res = await fetch('/api/request', {
+      const data = await apiFetch('/api/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromAddress: wallet.address,
-          toAddress,
-          amount,
-          currency,
-        }),
+        body: JSON.stringify({ to: toAddress.trim(), amount, currency }),
       });
-      const data = await res.json();
       if (data.success) {
         setToAddress('');
         setAmount('');
         setTab('incoming');
         fetchRequests();
-      } else setError(data.error);
-    } catch (e) { setError('Failed to create request'); }
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to create request');
+    }
     setSending(false);
   };
 
   const approveRequest = async (req) => {
     setSending(true);
+    setError('');
     try {
-      const payRes = await fetch('/api/payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senderSeed: wallet.seed,
-          destAddress: req.fromAddress,
-          amount: req.amount,
-          destCurrency: req.currency,
-          sendMaxCurrency: req.currency,
-        }),
-      });
-      const payData = await payRes.json();
-
-      await fetch('/api/request', {
+      await apiFetch('/api/request', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId: req.id,
-          action: payData.success ? 'approved' : 'declined',
-          txHash: payData.hash,
-        }),
+        body: JSON.stringify({ requestId: req.id, action: 'approved' }),
       });
       fetchRequests();
-    } catch (e) { setError('Failed to process request'); }
+    } catch (err) {
+      setError(err.message || 'Failed to process request');
+    }
     setSending(false);
   };
 
   const declineRequest = async (req) => {
-    await fetch('/api/request', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId: req.id, action: 'declined' }),
-    });
-    fetchRequests();
+    setError('');
+    try {
+      await apiFetch('/api/request', {
+        method: 'PUT',
+        body: JSON.stringify({ requestId: req.id, action: 'declined' }),
+      });
+      fetchRequests();
+    } catch (err) {
+      setError(err.message || 'Failed to decline request');
+    }
   };
 
   const handleClaim = async (escrow) => {
@@ -121,25 +105,21 @@ export default function Request() {
       // Use the appropriate API based on whether it's a split or standalone escrow
       const apiUrl = escrow.isSplit ? '/api/split' : '/api/escrow';
       const body = escrow.isSplit
-        ? { escrowId: escrow.id, code: claimCode, claimerSeed: wallet.seed }
-        : { code: claimCode, claimerSeed: wallet.seed };
+        ? { escrowId: escrow.id, code: claimCode }
+        : { code: claimCode };
 
-      const res = await fetch(apiUrl, {
+      const data = await apiFetch(apiUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
       if (data.success) {
         setClaimSuccess({ id: escrow.id, amount: data.amount, currency: data.currency, explorerUrl: data.explorerUrl });
         setClaimingId(null);
         setClaimCode('');
         fetchSplits();
-      } else {
-        setClaimError(data.error || 'Claim failed');
       }
-    } catch (e) {
-      setClaimError('Claim failed');
+    } catch (err) {
+      setClaimError(err.message || 'Claim failed');
     }
     setSending(false);
   };
@@ -149,28 +129,24 @@ export default function Request() {
     setDirectClaimError('');
     setDirectClaiming(true);
     try {
-      const res = await fetch('/api/escrow', {
+      const data = await apiFetch('/api/escrow', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: directCode, claimerSeed: wallet.seed }),
+        body: JSON.stringify({ code: directCode }),
       });
-      const data = await res.json();
       if (data.success) {
         setClaimSuccess({ amount: data.amount, currency: data.currency, explorerUrl: data.explorerUrl });
         setDirectCode('');
         fetchSplits();
-      } else {
-        setDirectClaimError(data.error || 'Claim failed');
       }
-    } catch (e) {
-      setDirectClaimError('Claim failed');
+    } catch (err) {
+      setDirectClaimError(err.message || 'Claim failed');
     }
     setDirectClaiming(false);
   };
 
   if (!wallet) return null;
 
-  const incoming = requests.filter((r) => r.toAddress === wallet.address && r.status === 'pending');
+  const incoming = requests.filter((r) => r.direction === 'incoming' && r.status === 'pending');
 
   const claimsBadge = pendingEscrows.length;
 
@@ -244,7 +220,7 @@ export default function Request() {
                 <svg className="w-5 h-5 text-[#1C1C1E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="font-bold text-[#1C1C1E]">{claimSuccess.amount} XRP claimed!</span>
+                <span className="font-bold text-[#1C1C1E]">{claimSuccess.amount} {claimSuccess.currency || 'USD'} claimed</span>
               </div>
               <a
                 href={claimSuccess.explorerUrl}
@@ -261,18 +237,20 @@ export default function Request() {
           {/* ── Always-visible: Claim by Code Card (Matching Reference Image 3) ── */}
           <div className="card rounded-3xl p-6 bg-[#F2F2F7] border border-[#E5E5EA]">
             <p className="text-base font-bold text-[#1C1C1E] mb-0.5">Claim by Code</p>
-            <p className="text-xs text-[#8E8E93] font-medium mb-4">Enter a 6-digit code to receive funds.</p>
+            <p className="text-xs text-[#8E8E93] font-medium mb-4">Enter the 10-character code to receive funds.</p>
             <input
               value={directCode}
-              onChange={(e) => setDirectCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="0 0 0 0 0 0"
-              maxLength={6}
-              className="w-full px-4 py-3.5 rounded-2xl text-center text-xl font-mono tracking-[0.4em] input-field bg-[#FFFFFF] border-[#E5E5EA] text-[#1C1C1E] mb-4"
+              onChange={(e) => setDirectCode(e.target.value.toUpperCase().replace(/[^0-9A-Z-]/g, '').slice(0, 11))}
+              placeholder="XXXXX-XXXXX"
+              maxLength={11}
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full px-4 py-3.5 rounded-2xl text-center text-xl font-mono tracking-[0.2em] input-field bg-[#FFFFFF] border-[#E5E5EA] text-[#1C1C1E] mb-4"
             />
             {directClaimError && <p className="text-xs text-[#1C1C1E] font-semibold mb-3">{directClaimError}</p>}
             <button
               onClick={handleDirectClaim}
-              disabled={directClaiming || directCode.length !== 6}
+              disabled={directClaiming || normalizeClaimCode(directCode).length !== 10}
               className="w-full py-4 rounded-2xl font-semibold text-sm disabled:opacity-40 bg-[#000000] text-white shadow-sm active:scale-[0.98] transition-transform"
             >
               {directClaiming ? 'Claiming...' : 'Claim'}
@@ -299,7 +277,7 @@ export default function Request() {
                     </p>
                     <p className="text-xs text-[#8E8E93] mt-0.5 font-medium">
                       {expired
-                        ? <span className="text-[#1C1C1E] font-semibold">Expired — funds returned to sender</span>
+                        ? <span className="text-[#1C1C1E] font-semibold">Expired — refund available to sender</span>
                         : <>Expires in <span className="font-mono font-semibold text-[#1C1C1E]">{mins}:{secs.toString().padStart(2, '0')}</span></>
                       }
                     </p>
@@ -318,20 +296,22 @@ export default function Request() {
 
                 {isClaiming && (
                   <div className="mt-3 space-y-3">
-                    <p className="text-xs text-[#8E8E93] font-medium">Enter the 6-digit code from the sender:</p>
+                    <p className="text-xs text-[#8E8E93] font-medium">Enter the 10-character code from the sender:</p>
                     <input
                       value={claimCode}
-                      onChange={(e) => setClaimCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="000000"
-                      maxLength={6}
-                      className="w-full px-4 py-3 rounded-2xl text-center text-xl font-mono tracking-[0.3em] input-field bg-[#FFFFFF] border-[#E5E5EA] text-[#1C1C1E]"
+                      onChange={(e) => setClaimCode(e.target.value.toUpperCase().replace(/[^0-9A-Z-]/g, '').slice(0, 11))}
+                      placeholder="XXXXX-XXXXX"
+                      maxLength={11}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="w-full px-4 py-3 rounded-2xl text-center text-xl font-mono tracking-[0.2em] input-field bg-[#FFFFFF] border-[#E5E5EA] text-[#1C1C1E]"
                       autoFocus
                     />
                     {claimError && <p className="text-xs text-[#1C1C1E] font-semibold">{claimError}</p>}
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleClaim(escrow)}
-                        disabled={sending || claimCode.length !== 6}
+                        disabled={sending || normalizeClaimCode(claimCode).length !== 10}
                         className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 bg-[#000000] text-white shadow-sm"
                       >
                         {sending ? 'Claiming...' : 'Confirm & Claim'}
@@ -389,11 +369,11 @@ export default function Request() {
       {tab === 'create' && (
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wider font-semibold">Request from (their address)</label>
+            <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wider font-semibold">Request from (@username or address)</label>
             <input
               value={toAddress}
               onChange={(e) => setToAddress(e.target.value)}
-              placeholder="rXXXXXXXXX..."
+              placeholder="@username or rXXXXXXXXX..."
               className="w-full px-4 py-3.5 rounded-2xl font-mono text-sm input-field bg-[#F2F2F7] border-[#E5E5EA] text-[#1C1C1E]"
             />
           </div>

@@ -1,42 +1,121 @@
-// app/components/WalletProvider.js
 'use client';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 const WalletContext = createContext(null);
 
 export function WalletProvider({ children }) {
-  const [wallet, setWallet] = useState(null); // { address, seed, username }
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [wallet, setWallet] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(false);
 
-  // Restore wallet from sessionStorage on mount
-  useEffect(() => {
-    const saved = sessionStorage.getItem('xenmo_wallet');
-    if (saved) {
-      try { setWallet(JSON.parse(saved)); } catch (e) { /* ignore */ }
+  const load = useCallback(async () => {
+    try {
+      const response = await fetch('/api/me', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+
+      if (response.status === 401) {
+        setUser(null);
+        setProfile(null);
+        setWallet(null);
+        return;
+      }
+
+      if (response.status === 503) {
+        setAuthError(true);
+        setUser(null);
+        setProfile(null);
+        setWallet(null);
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        setUser(null);
+        setProfile(null);
+        setWallet(null);
+        return;
+      }
+
+      setUser(data.user || null);
+      setProfile(data.profile || null);
+      setWallet(
+        data.wallet
+          ? {
+              address: data.wallet.address,
+              username: data.profile?.username || null,
+              displayName: data.profile?.displayName || '',
+              baseCurrency: data.profile?.baseCurrency || 'USD',
+            }
+          : null
+      );
+    } catch {
+      setUser(null);
+      setProfile(null);
+      setWallet(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  const login = (address, seed, username, baseCurrency) => {
-    const w = { address, seed, username, baseCurrency };
-    setWallet(w);
-    sessionStorage.setItem('xenmo_wallet', JSON.stringify(w));
-  };
+  useEffect(() => {
+    let subscription = null;
 
-  const logout = () => {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      load();
+
+      const listener = supabase.auth.onAuthStateChange((event) => {
+        if (['SIGNED_IN', 'SIGNED_OUT', 'USER_UPDATED'].includes(event)) load();
+      });
+      subscription = listener.data.subscription;
+    } catch {
+      setAuthError(true);
+      setLoading(false);
+    }
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [load]);
+
+  const logout = async () => {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Local state is cleared below regardless.
+    }
+
+    setUser(null);
+    setProfile(null);
     setWallet(null);
-    sessionStorage.removeItem('xenmo_wallet');
+    window.location.assign('/login');
   };
 
   return (
-    <WalletContext.Provider value={{ wallet, loading, login, logout }}>
+    <WalletContext.Provider
+      value={{
+        user,
+        profile,
+        wallet,
+        loading,
+        authError,
+        refreshUser: load,
+        logout,
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );
 }
 
 export function useWallet() {
-  const ctx = useContext(WalletContext);
-  if (!ctx) throw new Error('useWallet must be used within WalletProvider');
-  return ctx;
+  const context = useContext(WalletContext);
+  if (!context) throw new Error('useWallet must be used within WalletProvider');
+  return context;
 }

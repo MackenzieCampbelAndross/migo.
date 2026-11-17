@@ -2,9 +2,12 @@
 'use client';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useWallet } from './WalletProvider';
+import { apiFetch } from '@/lib/client-api';
 
 export default function ChatBot() {
   const pathname = usePathname();
+  const { user } = useWallet();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'bot', text: 'Hi! I\'m Migo Assistant. Ask me anything about sending money internationally.' },
@@ -12,26 +15,24 @@ export default function ChatBot() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Hide on landing page
-  if (pathname === '/') return null;
+  // Hide on public screens and before authentication resolves
+  if (!user || pathname === '/' || pathname === '/login' || pathname.startsWith('/auth')) return null;
 
   const send = async () => {
     if (!input.trim() || loading) return;
-    const userMsg = input.trim();
+    const userMsg = input.trim().slice(0, 500);
     setInput('');
     setMessages((m) => [...m, { role: 'user', text: userMsg }]);
     setLoading(true);
 
     try {
-      const res = await fetch('/api/chat', {
+      const data = await apiFetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMsg }),
       });
-      const data = await res.json();
-      setMessages((m) => [...m, { role: 'bot', text: data.reply }]);
-    } catch {
-      setMessages((m) => [...m, { role: 'bot', text: 'Sorry, something went wrong.' }]);
+      setMessages((m) => [...m, { role: 'bot', text: data.reply || 'Sorry, I could not answer that.' }]);
+    } catch (error) {
+      setMessages((m) => [...m, { role: 'bot', text: error?.message || 'Sorry, something went wrong.' }]);
     }
     setLoading(false);
   };
@@ -82,6 +83,7 @@ export default function ChatBot() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
+              maxLength={500}
               placeholder="Ask anything..."
               className="flex-1 px-3.5 py-2 rounded-xl text-sm input-field"
             />

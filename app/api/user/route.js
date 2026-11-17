@@ -1,43 +1,52 @@
-// app/api/user/route.js
-// GET: lookup user by username or wallet address
+import { ApiError, readQuery, withApi } from '@/lib/api';
+import { requireUser } from '@/lib/auth';
+import { enforceUserAndIpRateLimit } from '@/lib/rate-limit';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { usernameQuerySchema } from '@/lib/validation';
+
 export const dynamic = 'force-dynamic';
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
 
 export async function GET(req) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const username = searchParams.get('username');
-    const address = searchParams.get('address');
+  return withApi(req, async () => {
+    const user = await requireUser();
 
-    if (!username && !address) {
-      return NextResponse.json({ error: 'username or address required' }, { status: 400 });
+    await enforceUserAndIpRateLimit(req, user.id, 'user:lookup', {
+      userLimit: 30,
+      ipLimit: 60,
+      windowSeconds: 60,
+      failClosed: true,
+    });
+
+    const query = readQuery(new URL(req.url).searchParams, usernameQuerySchema);
+    const admin = createAdminClient();
+
+    const { data: profile, error } = await admin
+      .from('profiles')
+      .select('id, username, display_name, base_currency')
+      .eq('username', query.username)
+      .maybeSingle();
+
+    if (error) {
+      throw new ApiError(500, 'Unable to look up user');
     }
+    if (!profile) throw new ApiError(404, 'Recipient not found');
 
-    let query = supabase.from('users').select('wallet_address, display_name, username, base_currency');
+    const { data: wallet } = await admin
+      .from('wallets')
+      .select('address')
+      .eq('user_id', profile.id)
+      .maybeSingle();
 
-    if (username) {
-      query = query.eq('username', username.toLowerCase());
-    } else {
-      query = query.eq('wallet_address', address);
-    }
+    if (!wallet) throw new ApiError(404, 'Recipient not found');
 
-    const { data, error } = await query.single();
-
-    if (error || !data) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({
+    return {
       success: true,
       user: {
-        address: data.wallet_address,
-        username: data.username,
-        displayName: data.display_name,
-        baseCurrency: data.base_currency,
+        address: wallet.address,
+        username: profile.username,
+        displayName: profile.display_name,
+        baseCurrency: profile.base_currency,
       },
-    });
-  } catch (err) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
-  }
+    };
+  });
 }

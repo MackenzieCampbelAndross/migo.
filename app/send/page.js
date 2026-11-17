@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useWallet } from '../components/WalletProvider';
+import { apiFetch, newIdempotencyKey } from '@/lib/client-api';
 import dynamic from 'next/dynamic';
 
 const TransferGlobe = dynamic(() => import('../components/TransferGlobe'), { ssr: false });
@@ -30,6 +31,11 @@ function SendInner() {
   const [lookingUp, setLookingUp] = useState(false);
   const [showGlobe, setShowGlobe] = useState(false);
   const [globeDone, setGlobeDone] = useState(false);
+  const sendKeyRef = useRef(null);
+
+  useEffect(() => {
+    sendKeyRef.current = newIdempotencyKey();
+  }, [dest, amount, fromCurrency, toCurrency]);
 
   // Resolve @username to wallet address
   const resolveRecipient = async () => {
@@ -39,18 +45,15 @@ function SendInner() {
       const username = value.replace(/^@/, '');
       setLookingUp(true);
       try {
-        const res = await fetch(`/api/user?username=${encodeURIComponent(username)}`);
-        const data = await res.json();
+        const data = await apiFetch(`/api/user?username=${encodeURIComponent(username)}`);
         if (data.success) {
           setResolvedUser(data.user);
           setDest(data.user.address);
           setError('');
-        } else {
-          setResolvedUser(null);
-          setError(`User @${username} not found`);
         }
-      } catch {
-        setError('Lookup failed');
+      } catch (err) {
+        setResolvedUser(null);
+        setError(err.message || 'Lookup failed');
       }
       setLookingUp(false);
     } else {
@@ -61,11 +64,13 @@ function SendInner() {
   const checkRate = async () => {
     setError('');
     try {
-      const res = await fetch(`/api/payment?from=${fromCurrency}&to=${toCurrency}&amount=${amount}&sender=${wallet.address}&receiver=${dest}`);
-      const data = await res.json();
-      if (data.success) setRate(data);
-      else setError(data.error);
-    } catch (e) { setError('Failed to get rate'); }
+      const data = await apiFetch(
+        `/api/payment?fromCurrency=${fromCurrency}&toCurrency=${toCurrency}&amount=${encodeURIComponent(amount)}&recipient=${encodeURIComponent(dest)}`
+      );
+      setRate(data);
+    } catch (err) {
+      setError(err.message || 'Failed to get rate');
+    }
   };
 
   const handleSend = async () => {
@@ -74,22 +79,22 @@ function SendInner() {
     setGlobeDone(false);
     setError('');
     try {
-      const res = await fetch('/api/payment', {
+      const data = await apiFetch('/api/payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          senderSeed: wallet.seed,
-          destAddress: dest,
-          amount: rate?.estimatedReceive || amount,
-          destCurrency: toCurrency,
-          sendMaxCurrency: fromCurrency,
-          sendAmount: amount,
+          to: dest,
+          amount,
+          fromCurrency,
+          toCurrency,
+          idempotencyKey: sendKeyRef.current || newIdempotencyKey(),
         }),
       });
-      const data = await res.json();
-      if (data.success) setReceipt(data);
-      else { setError(data.error); setShowGlobe(false); }
-    } catch (e) { setError('Payment failed'); setShowGlobe(false); }
+      setReceipt(data);
+      sendKeyRef.current = newIdempotencyKey();
+    } catch (err) {
+      setError(err.message || 'Payment failed');
+      setShowGlobe(false);
+    }
     setSending(false);
   };
 
@@ -268,14 +273,24 @@ function SendInner() {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-[#8E8E93]">Rate</span>
-              <span className="text-[#1C1C1E] font-medium">1 {fromCurrency} = {rate.rate.toFixed(2)} {toCurrency}</span>
+              <span className="text-[#1C1C1E] font-medium">1 {fromCurrency} = {Number(rate.rate).toFixed(2)} {toCurrency}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-[#8E8E93]">Minimum received</span>
+              <span className="font-semibold text-[#1C1C1E]">{parseFloat(rate.minReceived).toFixed(2)} {toCurrency}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-[#8E8E93]">Migo fee</span>
               <span className="font-semibold text-[#1C1C1E]">{rate.fee}</span>
             </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-[#8E8E93]">Network fee</span>
+              <span className="text-[#636366]">{rate.networkFee}</span>
+            </div>
             <div className="border-t border-[#E5E5EA] pt-2.5 mt-2">
-              <p className="text-[10px] text-[#8E8E93] font-semibold mb-1.5 uppercase tracking-wider">Fees to send {amount} {fromCurrency}:</p>
+              <p className="text-[10px] text-[#8E8E93] font-semibold mb-1.5 uppercase tracking-wider">
+                Estimated comparison for {amount} {fromCurrency} ({rate.rateSource === 'pathfind' ? 'live testnet AMM/DEX' : 'fallback rate'}):
+              </p>
               <div className="text-xs space-y-1.5">
                 <div className="flex justify-between text-[#8E8E93]"><span>Western Union</span><span className="text-[#636366]">~${rate.competitors.westernUnion.total} in fees</span></div>
                 <div className="flex justify-between text-[#8E8E93]"><span>Wise</span><span className="text-[#636366]">~${rate.competitors.wise.total} in fees</span></div>

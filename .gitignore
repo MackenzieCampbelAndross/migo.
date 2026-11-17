@@ -3,9 +3,12 @@ node_modules/
 .env
 .env.local
 .env*.local
+.env.bootstrap
 
-# next-pwa generated files
-public/sw.js
+# Local-only XRPL bootstrap output (must never be committed)
+lib/config.json
+
+# Generated service worker artifacts (the source service worker is public/sw.js)
 public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map

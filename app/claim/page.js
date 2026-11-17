@@ -1,53 +1,53 @@
-// app/claim/page.js
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useWallet } from '../components/WalletProvider';
+import { apiFetch } from '@/lib/client-api';
+import { normalizeClaimCode } from '@/lib/claim-code-format';
 
 export default function Claim() {
   const router = useRouter();
+  const { wallet, loading } = useWallet();
   const [code, setCode] = useState('');
-  const [seed, setSeed] = useState('');
-  const [mode, setMode] = useState('existing'); // 'existing' or 'new'
   const [claiming, setClaiming] = useState(false);
   const [result, setResult] = useState(null);
-  const [newWallet, setNewWallet] = useState(null);
   const [error, setError] = useState('');
 
-  const createWalletFirst = async () => {
-    setClaiming(true);
-    setError('');
-    try {
-      const res = await fetch('/api/wallet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseCurrency: 'USD' }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setNewWallet(data);
-        setSeed(data.seed);
-      } else throw new Error(data.error);
-    } catch (e) { setError(e.message); }
-    setClaiming(false);
-  };
+  const codeComplete = normalizeClaimCode(code).length === 10;
 
   const handleClaim = async () => {
     setClaiming(true);
     setError('');
     try {
-      const res = await fetch('/api/escrow', {
+      const data = await apiFetch('/api/escrow', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim(), claimerSeed: seed.trim() }),
+        body: JSON.stringify({ code }),
       });
-      const data = await res.json();
-      if (data.success) setResult(data);
-      else setError(data.error || 'Failed to claim');
-    } catch (e) { setError('Claim failed'); }
+      setResult(data);
+    } catch (err) {
+      setError(err.message || 'Failed to claim');
+    }
     setClaiming(false);
   };
 
-  // Success screen
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen text-[#8E8E93] text-sm">Loading...</div>;
+  }
+
+  if (!wallet) {
+    return (
+      <div className="px-5 pt-16 max-w-md mx-auto text-center">
+        <p className="text-sm text-[#8E8E93] mb-4">Create or import a wallet before claiming funds.</p>
+        <button
+          onClick={() => router.push('/')}
+          className="w-full py-4 rounded-2xl font-semibold bg-[#000000] text-white"
+        >
+          Go to wallet setup
+        </button>
+      </div>
+    );
+  }
+
   if (result) {
     return (
       <div className="px-4 pt-4 pb-12 max-w-md mx-auto">
@@ -65,23 +65,22 @@ export default function Claim() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-[#1C1C1E]">Funds Claimed!</h2>
-          <p className="text-[#1C1C1E] text-xl font-extrabold mt-2">{result.amount} {result.currency || 'USD'} received</p>
+          <h2 className="text-xl font-bold text-[#1C1C1E]">Funds Claimed</h2>
+          <p className="text-[#1C1C1E] text-xl font-extrabold mt-2">
+            {result.amount} {result.currency || 'USD'} received
+          </p>
         </div>
-        <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-4 mb-4">
-          <a
-            href={result.explorerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#1C1C1E] text-sm font-semibold underline block text-center"
-          >
-            View on XRPL Explorer →
-          </a>
-        </div>
-        {newWallet && (
-          <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-4 mt-4">
-            <p className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-2">Your new wallet seed (save this!):</p>
-            <code className="text-xs font-mono text-[#1C1C1E] break-all select-all font-bold">{newWallet.seed}</code>
+
+        {result.explorerUrl && (
+          <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-4 mb-4">
+            <a
+              href={result.explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#1C1C1E] text-sm font-semibold underline block text-center"
+            >
+              View on XRPL Explorer →
+            </a>
           </div>
         )}
 
@@ -106,67 +105,39 @@ export default function Claim() {
       </header>
 
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-[#1C1C1E]">
-          Migo Claim
-        </h1>
-        <p className="text-sm text-[#8E8E93] mt-2">Enter your 6-digit code to receive funds.</p>
+        <h1 className="text-2xl font-bold text-[#1C1C1E]">Migo Claim</h1>
+        <p className="text-sm text-[#8E8E93] mt-2">Enter the 10-character code to receive funds.</p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-2 block text-center">6-digit claim code</label>
+          <label className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-2 block text-center">
+            Claim code
+          </label>
           <input
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="847291"
-            maxLength={6}
-            className="w-full px-4 py-4 rounded-2xl text-center font-mono text-2xl font-bold tracking-[0.3em] bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000] transition-colors"
+            onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^0-9A-Z-]/g, '').slice(0, 11))}
+            placeholder="XXXXX-XXXXX"
+            maxLength={11}
+            autoComplete="off"
+            spellCheck={false}
+            className="w-full px-4 py-4 rounded-2xl text-center font-mono text-xl font-bold tracking-[0.2em] bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000] transition-colors"
           />
         </div>
-
-        {/* Wallet selection */}
-        <div className="flex gap-2 p-1 bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl">
-          <button
-            onClick={() => setMode('existing')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${mode === 'existing' ? 'bg-[#000000] text-white shadow-sm' : 'text-[#8E8E93] hover:text-[#1C1C1E]'}`}
-          >
-            I have a wallet
-          </button>
-          <button
-            onClick={() => { setMode('new'); if (!newWallet) createWalletFirst(); }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${mode === 'new' ? 'bg-[#000000] text-white shadow-sm' : 'text-[#8E8E93] hover:text-[#1C1C1E]'}`}
-          >
-            Create new wallet
-          </button>
-        </div>
-
-        {mode === 'existing' && (
-          <div>
-            <label className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wider mb-1.5 block">Wallet Seed</label>
-            <input
-              value={seed}
-              onChange={(e) => setSeed(e.target.value)}
-              placeholder="Your wallet seed (sEdXXX...)"
-              className="w-full px-4 py-3.5 rounded-2xl font-mono text-xs bg-[#F2F2F7] border border-[#E5E5EA] text-[#1C1C1E] focus:outline-none focus:border-[#000000] transition-colors"
-            />
-          </div>
-        )}
-
-        {mode === 'new' && newWallet && (
-          <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-4">
-            <p className="text-xs font-semibold text-[#1C1C1E]">✓ Wallet created: <span className="font-mono text-[#8E8E93]">{newWallet.address.slice(0, 12)}...</span></p>
-          </div>
-        )}
 
         {error && <p className="text-[#1C1C1E] font-semibold text-sm bg-[#F2F2F7] border border-[#E5E5EA] p-3 rounded-xl">{error}</p>}
 
         <button
           onClick={handleClaim}
-          disabled={claiming || code.length !== 6 || !seed}
+          disabled={claiming || !codeComplete}
           className="w-full py-4 rounded-2xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] disabled:opacity-40 transition-all shadow-sm"
         >
           {claiming ? 'Claiming...' : 'Claim Funds'}
         </button>
+
+        <p className="text-[11px] text-[#8E8E93] text-center leading-relaxed">
+          Claim codes are only valid on the XRPL testnet. Never share a wallet seed.
+        </p>
       </div>
     </div>
   );

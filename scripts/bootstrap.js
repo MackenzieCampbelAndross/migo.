@@ -1,21 +1,22 @@
 // ============================================================
-// BOOTSTRAP: Full Testnet Environment Setup
+// BOOTSTRAP: Testnet issuer + liquidity setup
 // ============================================================
-// Run this ONCE before the hackathon (or at the start).
-// It creates everything your app needs on testnet:
+// Run this ONCE to create fresh, uncompromised testnet issuers:
 //
 //   1. Issuer accounts for USD, INR, EUR, NGN
 //   2. defaultRipple enabled on all issuers
 //   3. AMM liquidity pools (each currency paired with XRP)
-//   4. Two demo user wallets with token balances
-//   5. Saves everything to config.json
+//   4. Two temporary wallets used only for a verification payment
+//   5. Writes issuer secrets to a gitignored .env.bootstrap file
 //
-// After running: your app reads config.json and is ready to go.
+// The app reads issuer configuration from environment variables. It never
+// reads lib/config.json.
 //
 // USAGE:
-//   node 07-full-bootstrap.js
+//   npm run bootstrap
 //
-// OUTPUT: config.json in the same directory
+// OUTPUT: .env.bootstrap (gitignored). Merge it into .env.local, then delete
+// the bootstrap file. Do not print or commit its contents.
 // ============================================================
 
 import * as xrpl from 'xrpl';
@@ -309,50 +310,20 @@ async function main() {
   }
   console.log('');
 
-  // ─── STEP 9: Save Config ───
-  const config = {
-    testnetUrl: TESTNET_URL,
-    explorerUrl: 'https://testnet.xrpl.org',
-    issuers: {},
-    lp: {
-      address: lpWallet.address,
-      seed: lpWallet.seed,
-    },
-    demoUsers: {
-      user1: {
-        label: 'US User',
-        address: user1.address,
-        seed: user1.seed,
-        balances: { USD: '500', EUR: '200' },
-      },
-      user2: {
-        label: 'India User',
-        address: user2.address,
-        seed: user2.seed,
-        balances: { INR: '25000' },
-      },
-    },
-    ammPools,
-    dexOffersCreated: true,
-    exchangeRates: {
-      'USD/XRP': '1 USD = 0.5 XRP',
-      'INR/XRP': '1 INR = 0.006 XRP (1 USD ≈ 83 INR)',
-      'EUR/XRP': '1 EUR = 0.55 XRP (1 USD ≈ 0.92 EUR)',
-      'NGN/XRP': '1 NGN = 0.00032 XRP (1 USD ≈ 1550 NGN)',
-    },
-    createdAt: new Date().toISOString(),
-  };
+  // ─── STEP 9: Write environment block ───
+  const envLines = [
+    `XRPL_TESTNET_URL=${TESTNET_URL}`,
+    'XRPL_EXPLORER_URL=https://testnet.xrpl.org',
+    '',
+  ];
 
   for (const [currency, wallet] of Object.entries(issuers)) {
-    config.issuers[currency] = {
-      address: wallet.address,
-      seed: wallet.seed,
-    };
+    envLines.push(`XRPL_ISSUER_${currency}_ADDRESS=${wallet.address}`);
+    envLines.push(`XRPL_ISSUER_${currency}_SEED=${wallet.seed}`);
   }
 
-  const configPath = fileURLToPath(new URL('../lib/config.json', import.meta.url));
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  console.log(`✅ Config saved to ${configPath}\n`);
+  const envPath = fileURLToPath(new URL('../.env.bootstrap', import.meta.url));
+  fs.writeFileSync(envPath, `${envLines.join('\n')}\n`, { mode: 0o600 });
 
   // ─── SUMMARY ───
   console.log('=========================================');
@@ -360,15 +331,16 @@ async function main() {
   console.log('=========================================');
   console.log(`  Issuers:      ${Object.keys(issuers).join(', ')}`);
   console.log(`  DEX Offers:   ${Object.keys(dexConfig).length} currency pairs`);
-  console.log(`  Demo Users:   2 (US + India)`);
-  console.log(`  Config:     ./config.json`);
+  console.log(`  Env file:     ${envPath}`);
   console.log('');
-  console.log('  Copy config.json to your Next.js app:');
-  console.log('    cp config.json ../remitx/lib/config.json');
+  console.log('  Next steps:');
+  console.log('    1. Merge .env.bootstrap into .env.local (keep it private).');
+  console.log('    2. Delete .env.bootstrap.');
+  console.log('    3. Add WALLET_ENCRYPTION_KEY, CLAIM_CODE_PEPPER, CRON_SECRET');
+  console.log('       and Supabase/Gemini values to .env.local.');
+  console.log('    4. Apply supabase/migrations/0001_security_hardening.sql.');
   console.log('');
-  console.log('  Demo user seeds (for quick login):');
-  console.log(`    US User:    ${user1.seed}`);
-  console.log(`    India User: ${user2.seed}`);
+  console.log('  Old committed testnet keys are compromised. Do not reuse them.');
   console.log('=========================================\n');
 
   await client.disconnect();

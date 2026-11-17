@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '../components/WalletProvider';
+import { apiFetch } from '@/lib/client-api';
 import { QRCodeSVG } from 'qrcode.react';
 
 const CURRENCY_SYMBOLS = { USD: '$', INR: '₹', EUR: '€', NGN: '₦', XRP: '' };
@@ -12,38 +13,20 @@ export default function Dashboard() {
   const { wallet, loading, logout } = useWallet();
   const router = useRouter();
   const [balance, setBalance] = useState(null);
-  const [baseCurrency, setBaseCurrency] = useState(wallet?.baseCurrency || null);
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Determine base currency from wallet context or fetch from API
-  useEffect(() => {
-    if (!wallet) return;
-    if (wallet.baseCurrency) {
-      setBaseCurrency(wallet.baseCurrency);
-    } else {
-      // Fallback: fetch from user API
-      fetch(`/api/user?address=${wallet.address}`)
-        .then(r => r.json())
-        .then(d => { if (d.success) setBaseCurrency(d.user.baseCurrency || 'USD'); })
-        .catch(() => setBaseCurrency('USD'));
-    }
-  }, [wallet]);
-
   const fetchBalance = useCallback(async () => {
     if (!wallet) return;
-    const cur = baseCurrency || wallet.baseCurrency;
-    if (!cur) return;
     try {
-      const res = await fetch(`/api/wallet?address=${wallet.address}&_t=${Date.now()}`, {
-        cache: 'no-store',
-      });
-      const data = await res.json();
+      const data = await apiFetch('/api/wallet');
       if (data.success && data.balances) {
-        setBalance(data.balances[cur] || '0');
+        setBalance(data.balances[wallet.baseCurrency || 'USD'] || '0');
       }
-    } catch (e) { console.error(e); }
-  }, [wallet, baseCurrency]);
+    } catch (error) {
+      if (error?.status !== 401) console.error('Balance refresh failed');
+    }
+  }, [wallet]);
 
   useEffect(() => {
     if (!loading && !wallet) { router.push('/'); return; }
@@ -75,7 +58,7 @@ export default function Dashboard() {
 
   if (loading || !wallet) return <div className="flex items-center justify-center h-full min-h-[400px] text-[#8E8E93] text-sm font-light">Loading...</div>;
 
-  const cur = baseCurrency || 'USD';
+  const cur = wallet.baseCurrency || 'USD';
   const symbol = CURRENCY_SYMBOLS[cur] || '';
   const name = CURRENCY_NAMES[cur] || cur;
   const formatted = balance !== null

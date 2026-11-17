@@ -1,216 +1,270 @@
-// app/api/history/route.js
-// GET: transaction history pulled directly from XRPL ledger (no DB needed)
-export const dynamic = 'force-dynamic';
-import { NextResponse } from 'next/server';
 import * as xrpl from 'xrpl';
+import { readQuery, withApi } from '@/lib/api';
+import { requireUser, requireWallet } from '@/lib/auth';
+import { safeLog } from '@/lib/logger';
+import { enforceUserAndIpRateLimit } from '@/lib/rate-limit';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getClient } from '@/lib/xrpl-client';
-import { supabase } from '@/lib/supabase';
-import config from '@/lib/config.json';
+import { getXrplConfig } from '@/lib/xrpl-config';
+import { historyQuerySchema } from '@/lib/validation';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const MID_RATES_TO_XRP = { USD: 1.36, INR: 125, EUR: 1.17, NGN: 1878 };
 const CURRENCY_SYMBOLS = { USD: '$', INR: '\u20b9', EUR: '\u20ac', NGN: '\u20a6' };
-
-// Only show these transaction types in history
 const SHOW_TYPES = new Set(['Payment', 'EscrowCreate', 'EscrowFinish']);
+const REFUND_DELAY_MS = 3 * 60 * 1000;
 
 function parseDate(tx, wrapper) {
-  // API v2: close_time_iso at top level; API v1: date inside tx
   if (wrapper.close_time_iso) return wrapper.close_time_iso;
   if (tx.date) return new Date((tx.date + 946684800) * 1000).toISOString();
   return null;
 }
 
-export async function GET(req) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const address = searchParams.get('address');
-    if (!address) return NextResponse.json({ error: 'Address required' }, { status: 400 });
+function feeForPayment(senderChanges, deliveredValue, deliveredCurrency, currencySent, amountSent) {
+  if (currencySent === deliveredCurrency || Number(amountSent) <= 0) {
+    return `${CURRENCY_SYMBOLS[currencySent] || ''}0.00`;
+  }
 
+  const midRate = (MID_RATES_TO_XRP[deliveredCurrency] || 1) / (MID_RATES_TO_XRP[currencySent] || 1);
+  const midReceive = Number(amountSent) * midRate;
+  const spreadLoss = midReceive - Number(deliveredValue);
+  const feeInSender = midRate > 0 ? Math.max(0, spreadLoss / midRate) : 0;
+  return `${CURRENCY_SYMBOLS[currencySent] || ''}${feeInSender.toFixed(2)}`;
+}
+
+function paymentEntry(tx, meta, hash, date, walletAddress) {
+  const delivered = meta.delivered_amount;
+  const deliveredValue = typeof delivered === 'string'
+    ? xrpl.dropsToXrp(delivered)
+    : delivered?.value || '0';
+  const deliveredCurrency = typeof delivered === 'string'
+    ? 'XRP'
+    : delivered?.currency || 'XRP';
+
+  const balanceChanges = xrpl.getBalanceChanges(meta);
+  const senderChanges = balanceChanges.find((change) => change.account === tx.Account);
+  const senderBalance = senderChanges?.balances || [];
+
+  let amountSent = '0';
+  let currencySent = deliveredCurrency;
+
+  const nonXrpChange = senderBalance.find(
+    (balance) => balance.currency !== 'XRP' && Number(balance.value) < 0
+  );
+
+  if (nonXrpChange) {
+    amountSent = Math.abs(Number(nonXrpChange.value)).toFixed(6);
+    currencySent = nonXrpChange.currency;
+  } else {
+    const xrpChange = senderBalance.find((balance) => balance.currency === 'XRP');
+    if (xrpChange) {
+      const xrpSpent = Math.abs(Number(xrpChange.value));
+      const guessedCurrency = deliveredCurrency !== 'XRP' ? deliveredCurrency : 'USD';
+      amountSent = (xrpSpent * (MID_RATES_TO_XRP[guessedCurrency] || 1)).toFixed(6);
+      currencySent = guessedCurrency;
+    }
+  }
+
+  if (Number(amountSent) === 0 && Number(deliveredValue) > 0) {
+    amountSent = Number(deliveredValue).toFixed(6);
+    currencySent = deliveredCurrency;
+  }
+
+  return {
+    txHash: hash,
+    type: 'Payment',
+    ledgerType: 'Payment',
+    isEscrow: false,
+    direction: tx.Account === walletAddress ? 'out' : 'in',
+    sender: tx.Account,
+    receiver: tx.Destination,
+    amountSent,
+    currencySent,
+    amountReceived: Number(deliveredValue).toFixed(6),
+    currencyReceived: deliveredCurrency,
+    effectiveRate: Number(amountSent) > 0
+      ? (Number(deliveredValue) / Number(amountSent)).toFixed(6)
+      : '1',
+    fee: feeForPayment(senderChanges, deliveredValue, deliveredCurrency, currencySent, amountSent),
+    explorerUrl: `${getXrplConfig().explorerUrl}/transactions/${hash}`,
+    createdAt: date,
+    escrowId: null,
+    escrowStatus: null,
+    canRefund: false,
+    isSplit: false,
+  };
+}
+
+function escrowEntry(row, kind, hash, date, userId) {
+  const isOwner = row.owner_user_id === userId;
+  const isClaimer = row.claimed_by_user_id === userId || row.destination_user_id === userId;
+  const expiredLongEnough =
+    row.expires_at &&
+    Date.now() > new Date(row.expires_at).getTime() + REFUND_DELAY_MS;
+
+  let label = 'Escrow';
+  if (kind === 'lock') label = isOwner ? 'Escrow locked' : 'Escrow';
+  if (kind === 'finish') label = 'Escrow claimed';
+  if (kind === 'mint') label = 'Escrow received';
+
+  const direction = kind === 'lock' ? (isOwner ? 'out' : 'in') : 'in';
+
+  return {
+    txHash: hash,
+    type: 'Escrow',
+    ledgerType: kind,
+    label,
+    isEscrow: true,
+    direction,
+    sender: row.owner_address,
+    receiver: row.destination_address || null,
+    amountSent: String(row.amount),
+    currencySent: row.currency,
+    amountReceived: String(row.amount),
+    currencyReceived: row.currency,
+    effectiveRate: '1',
+    fee: `${CURRENCY_SYMBOLS[row.currency] || ''}0.00`,
+    explorerUrl: `${getXrplConfig().explorerUrl}/transactions/${hash}`,
+    createdAt: date,
+    escrowId: row.id,
+    escrowStatus: row.status,
+    canRefund: Boolean(
+      isOwner &&
+      ['LOCKED', 'EXPIRED'].includes(row.status) &&
+      expiredLongEnough
+    ),
+    isSplit: Boolean(row.split_group_id),
+    isOwner,
+    isClaimer,
+  };
+}
+
+function legacyEscrowEntry(tx, hash, date, walletAddress) {
+  const amount = typeof tx.Amount === 'string'
+    ? xrpl.dropsToXrp(tx.Amount)
+    : tx.Amount?.value || '0';
+
+  return {
+    txHash: hash,
+    type: 'Escrow',
+    ledgerType: tx.TransactionType,
+    label: 'Legacy escrow',
+    isEscrow: true,
+    direction: tx.Account === walletAddress ? 'out' : 'in',
+    sender: tx.Account,
+    receiver: tx.Destination || tx.Owner || null,
+    amountSent: amount,
+    currencySent: 'XRP',
+    amountReceived: amount,
+    currencyReceived: 'XRP',
+    effectiveRate: '1',
+    fee: '0.000012 XRP',
+    explorerUrl: `${getXrplConfig().explorerUrl}/transactions/${hash}`,
+    createdAt: date,
+    escrowId: null,
+    escrowStatus: null,
+    canRefund: false,
+    isSplit: false,
+  };
+}
+
+export async function GET(req) {
+  return withApi(req, async () => {
+    const user = await requireUser();
+    const wallet = await requireWallet(user.id);
+
+    await enforceUserAndIpRateLimit(req, user.id, 'history:read', {
+      userLimit: 60,
+      ipLimit: 120,
+      windowSeconds: 60,
+      failClosed: false,
+    });
+
+    const query = readQuery(new URL(req.url).searchParams, historyQuerySchema);
     const client = await getClient();
 
-    // Fetch more than we need so we can filter out TrustSet/setup noise
     const response = await client.request({
       command: 'account_tx',
-      account: address,
+      account: wallet.address,
       limit: 50,
       ledger_index_min: -1,
       ledger_index_max: -1,
     });
 
-    const metaOf = (t) => typeof t.meta === 'object' ? t.meta : null;
+    const raw = (response.result.transactions || []).filter((entry) => {
+      if (!entry.meta || typeof entry.meta !== 'object') return false;
+      if (entry.meta.TransactionResult !== 'tesSUCCESS') return false;
+      if (entry.validated === false) return false;
+      const tx = entry.tx_json || entry.tx || entry;
+      return SHOW_TYPES.has(tx.TransactionType);
+    });
 
-    const txPromises = response.result.transactions
-      .filter((t) => {
-        const meta = metaOf(t);
-        if (!meta || meta.TransactionResult !== 'tesSUCCESS') return false;
-        // validated can be at transaction level or implied by the response range
-        if (t.validated === false) return false;
-        const tx = t.tx_json || t.tx || t;
-        return SHOW_TYPES.has(tx.TransactionType);
+    const hashes = raw
+      .map((entry) => {
+        const tx = entry.tx_json || entry.tx || entry;
+        return tx.hash || entry.hash;
       })
-      .map(async (t) => {
-        const tx = t.tx_json || t.tx || t;
-        const meta = t.meta;
-        const type = tx.TransactionType;
-        const hash = tx.hash || t.hash;
-        const date = parseDate(tx, t);
-        const fee = tx.Fee ? xrpl.dropsToXrp(tx.Fee) : '0.000012';
+      .filter(Boolean);
 
-        if (type === 'Payment') {
-          const delivered = meta.delivered_amount;
-          const deliveredValue = typeof delivered === 'string'
-            ? xrpl.dropsToXrp(delivered)
-            : delivered?.value || '0';
-          const deliveredCurrency = typeof delivered === 'string'
-            ? 'XRP'
-            : delivered?.currency || 'XRP';
+    const escrowByHash = new Map();
 
-          // Figure out what the sender spent (hide XRP from users)
-          const balanceChanges = xrpl.getBalanceChanges(meta);
-          const senderChanges = balanceChanges.find((c) => c.account === tx.Account);
+    if (hashes.length > 0) {
+      const admin = createAdminClient();
+      const participant = `owner_user_id.eq.${user.id},destination_user_id.eq.${user.id},claimed_by_user_id.eq.${user.id}`;
 
-          let amountSent = '0';
-          let currencySent = deliveredCurrency;
-          if (senderChanges) {
-            const nonFeeChange = senderChanges.balances.find(
-              (b) => b.currency !== 'XRP' && parseFloat(b.value) < 0
-            );
-            if (nonFeeChange) {
-              amountSent = Math.abs(parseFloat(nonFeeChange.value)).toFixed(2);
-              currencySent = nonFeeChange.currency;
-            } else {
-              // AMM routed through XRP — convert back to a user currency
-              const xrpChange = senderChanges.balances.find((b) => b.currency === 'XRP');
-              if (xrpChange) {
-                const xrpSpent = Math.abs(parseFloat(xrpChange.value));
-                const guessedCurrency = deliveredCurrency !== 'XRP' ? deliveredCurrency : 'USD';
-                amountSent = (xrpSpent * (MID_RATES_TO_XRP[guessedCurrency] || 1)).toFixed(2);
-                currencySent = guessedCurrency;
-              }
-            }
-          }
+      const [byBurn, byFinish, byMint] = await Promise.all([
+        admin.from('escrows').select('*').or(participant).in('burn_tx_hash', hashes),
+        admin.from('escrows').select('*').or(participant).in('tx_hash_finish', hashes),
+        admin.from('escrows').select('*').or(participant).in('mint_tx_hash', hashes),
+      ]);
 
-          if (parseFloat(amountSent) === 0 && parseFloat(deliveredValue) > 0) {
-            amountSent = parseFloat(deliveredValue).toFixed(2);
-            currencySent = deliveredCurrency;
-          }
+      for (const row of byBurn.data || []) {
+        if (row.burn_tx_hash) escrowByHash.set(row.burn_tx_hash, { row, kind: 'lock' });
+      }
+      for (const row of byFinish.data || []) {
+        if (row.tx_hash_finish) escrowByHash.set(row.tx_hash_finish, { row, kind: 'finish' });
+      }
+      for (const row of byMint.data || []) {
+        if (row.mint_tx_hash) escrowByHash.set(row.mint_tx_hash, { row, kind: 'mint' });
+      }
 
-          const effectiveRate = parseFloat(amountSent) > 0
-            ? (parseFloat(deliveredValue) / parseFloat(amountSent)).toFixed(4)
-            : '1';
+      if (byBurn.error || byFinish.error || byMint.error) {
+        safeLog('error', 'history.escrow_lookup_failed', {
+          code: byBurn.error?.code || byFinish.error?.code || byMint.error?.code,
+        });
+      }
+    }
 
-          // Fee = spread from mid-market in sender's currency
-          let feeDisplay = `${CURRENCY_SYMBOLS[currencySent] || ''}0.00`;
-          if (currencySent !== deliveredCurrency && parseFloat(amountSent) > 0) {
-            const midRate = (MID_RATES_TO_XRP[deliveredCurrency] || 1) / (MID_RATES_TO_XRP[currencySent] || 1);
-            const midReceive = parseFloat(amountSent) * midRate;
-            const spreadLoss = midReceive - parseFloat(deliveredValue);
-            const feeInSender = midRate > 0 ? Math.max(0, spreadLoss / midRate) : 0;
-            feeDisplay = `${CURRENCY_SYMBOLS[currencySent] || ''}${feeInSender.toFixed(2)}`;
-          }
+    const transactions = raw.map((entry) => {
+      const tx = entry.tx_json || entry.tx || entry;
+      const meta = entry.meta;
+      const hash = tx.hash || entry.hash;
+      const date = parseDate(tx, entry);
+      const mapped = hash ? escrowByHash.get(hash) : null;
 
-          return {
-            txHash: hash,
-            type,
-            sender: tx.Account,
-            receiver: tx.Destination,
-            amountSent,
-            currencySent,
-            amountReceived: parseFloat(deliveredValue).toFixed(2),
-            currencyReceived: deliveredCurrency,
-            effectiveRate,
-            fee: feeDisplay,
-            explorerUrl: `${config.explorerUrl}/transactions/${hash}`,
-            createdAt: date,
-          };
-        }
+      if (mapped) {
+        // The IOU mint is the value transfer. The 1-drop EscrowFinish is only
+        // the on-chain trigger, so skip it to avoid double-counting value.
+        if (mapped.kind === 'finish') return null;
+        return escrowEntry(mapped.row, mapped.kind, hash, date, user.id);
+      }
 
-        // EscrowCreate / EscrowFinish — extract XRP amount from balance changes
-        const balanceChanges = xrpl.getBalanceChanges(meta);
+      if (tx.TransactionType === 'Payment') {
+        return paymentEntry(tx, meta, hash, date, wallet.address);
+      }
 
-        // For EscrowCreate: Amount is on the tx itself (XRP locked)
-        // For EscrowFinish: Amount is NOT on tx — must be read from balance changes
-        let escrowAmount = '0';
-        let escrowSender = tx.Account;
-        let escrowReceiver = tx.Destination || tx.Owner || tx.Account;
+      return legacyEscrowEntry(tx, hash, date, wallet.address);
+    });
 
-        if (type === 'EscrowCreate' && tx.Amount) {
-          escrowAmount = typeof tx.Amount === 'string'
-            ? xrpl.dropsToXrp(tx.Amount)
-            : tx.Amount.value;
-        } else if (type === 'EscrowFinish') {
-          // The escrow destination receives XRP — find the positive XRP change
-          // that isn't the fee. Owner field = escrow creator.
-          escrowSender = tx.Owner || tx.Account;
-          // Find who gained XRP (the escrow destination)
-          for (const change of balanceChanges) {
-            if (change.account === tx.Account && tx.Account === escrowSender) continue; // skip fee payer if same as owner
-            const xrpGain = change.balances.find(
-              (b) => b.currency === 'XRP' && parseFloat(b.value) > 0
-            );
-            if (xrpGain) {
-              escrowAmount = parseFloat(xrpGain.value).toFixed(6);
-              escrowReceiver = change.account;
-              break;
-            }
-          }
-          // Fallback: if claimer is also the destination, look at owner's negative change
-          if (escrowAmount === '0') {
-            const ownerChange = balanceChanges.find((c) => c.account === escrowSender);
-            if (ownerChange) {
-              const xrpLoss = ownerChange.balances.find(
-                (b) => b.currency === 'XRP' && parseFloat(b.value) < 0
-              );
-              if (xrpLoss) {
-                // Subtract fee (12 drops) to get approximate escrow amount
-                escrowAmount = (Math.abs(parseFloat(xrpLoss.value)) - 0.000012).toFixed(6);
-                escrowReceiver = tx.Account;
-              }
-            }
-          }
-        }
-
-        // Look up the stored display amount/currency from the DB
-        // EscrowCreate: sequence = tx.Sequence, owner = tx.Account
-        // EscrowFinish: sequence = tx.OfferSequence, owner = tx.Owner
-        const escrowSeq = type === 'EscrowCreate' ? tx.Sequence : tx.OfferSequence;
-        const escrowOwner = type === 'EscrowCreate' ? tx.Account : (tx.Owner || tx.Account);
-        let displayAmount = escrowAmount;
-        let displayCurrency = 'USD'; // default if DB lookup fails
-
-        const { data: escrowRecord } = await supabase
-          .from('escrow_codes')
-          .select('amount, preimage_hex')
-          .eq('escrow_sequence', escrowSeq)
-          .eq('owner_address', escrowOwner)
-          .single();
-
-        if (escrowRecord) {
-          displayAmount = escrowRecord.amount || displayAmount;
-          displayCurrency = escrowRecord.preimage_hex || 'USD';
-        }
-
-        return {
-          txHash: hash,
-          type,
-          sender: escrowSender,
-          receiver: escrowReceiver,
-          amountSent: displayAmount,
-          currencySent: displayCurrency,
-          amountReceived: displayAmount,
-          currencyReceived: displayCurrency,
-          effectiveRate: '1',
-          fee: `${CURRENCY_SYMBOLS[displayCurrency] || ''}0.00`,
-          explorerUrl: `${config.explorerUrl}/transactions/${hash}`,
-          createdAt: date,
-        };
-      });
-
-    const transactions = (await Promise.all(txPromises)).slice(0, 20); // Return at most 20 meaningful entries
-
-    return NextResponse.json({ success: true, transactions });
-  } catch (err) {
-    console.error('History fetch failed:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
-  }
+    return {
+      success: true,
+      transactions: transactions
+        .filter(Boolean)
+        .filter((entry) => entry.txHash)
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        .slice(0, query.limit),
+    };
+  });
 }

@@ -1,38 +1,42 @@
-// app/api/chat/route.js
-// Proxies chat messages to Google Gemini API with Xenmo context
-import { NextResponse } from 'next/server';
-import { getRate } from '@/lib/xrpl-payment';
+import { ApiError, readJson, withApi } from '@/lib/api';
+import { getWalletByUserId, requireUser } from '@/lib/auth';
+import { safeLog } from '@/lib/logger';
+import { enforceRateLimit, enforceUserAndIpRateLimit } from '@/lib/rate-limit';
+import { getIssuerAddress } from '@/lib/xrpl-config';
+import { getQuote } from '@/lib/xrpl-payment';
+import { chatSchema, CURRENCIES } from '@/lib/validation';
 
-const SYSTEM_PROMPT = `You are Xenmo Assistant, a helpful chatbot for a cross-border payment app built on the XRP Ledger.
+export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
-About Xenmo:
-- Send money internationally with near-zero fees using XRPL blockchain
-- Supports USD, INR, EUR, NGN currencies
-- Three ways to send: QR scan, escrow code (6-digit), or direct address
-- Fees: ~$0.00 (0.000012 XRP per transaction) vs Western Union ($12+ per transfer)
-- Settlement: 3-5 seconds vs banks (2-5 days)
-- Exchange rates come from the XRPL decentralized exchange at market rates
+const SYSTEM_PROMPT = `You are Xenmo Assistant, a helpful chatbot for a testnet cross-border payment demo built on the XRP Ledger.
+
+About Xenmo/Migo:
+- Testnet demo only. No real money is involved.
+- Supports USD, INR, EUR and NGN test tokens.
+- Three ways to send: QR scan, claim code, or direct address.
+- Fees include the XRPL network fee and any AMM/DEX spread shown in the quote.
+- Settlement is typically a few seconds on the XRPL testnet.
+- Rates come from the XRPL testnet AMM/DEX when available; otherwise a clearly-labelled fallback rate is used.
 
 How to use:
-- Create a wallet: tap "Create Wallet" on the home screen
-- Send money: go to Send, enter address or scan QR, pick amount and currency
-- Receive: share your QR code or wallet address
-- Escrow code: generate a 6-digit code, share with recipient, they claim at /claim
-- Request money: go to Request, enter the payer's address and amount
+- Create a wallet after signing in, or import an existing testnet wallet.
+- Send money from the Send tab using a username or r-address.
+- Share your QR code or wallet address to receive money.
+- Claim codes are 10 characters. Unclaimed codes can be refunded after expiry.
+- Request money from the Request tab.
 
 Security:
-- Trust lines ensure you only accept tokens from verified issuers
-- Escrow codes auto-expire in 5 minutes — funds return if unclaimed
-- All transactions are atomic — fully complete or fully reversed, never stuck
+- Funds and claim codes auto-expire; refunded value returns to the sender.
+- Trust lines limit which issued tokens a wallet accepts.
+- Never share a wallet seed in chat.
 
-Keep responses short, friendly, and focused on helping the user. If they ask about something unrelated to payments, gently redirect.
-When given live rate data, use those exact numbers in your answer and mention that rates are live from the XRPL DEX/AMM.`;
-
-const SUPPORTED_CURRENCIES = ['USD', 'INR', 'EUR', 'NGN'];
+Keep responses short, friendly and focused on helping the user. If asked about something unrelated to payments, gently redirect.
+When live quote data is provided, use those exact numbers and mention the rate source.`;
 
 function detectRateQuery(message) {
-  const msg = message.toUpperCase();
-  const mentioned = SUPPORTED_CURRENCIES.filter(c => msg.includes(c));
+  const upper = message.toUpperCase();
+  const mentioned = CURRENCIES.filter((currency) => upper.includes(currency));
   if (mentioned.length >= 2 && /rate|convert|exchange|how much|cost|worth|send/i.test(message)) {
     return { from: mentioned[0], to: mentioned[1] };
   }
@@ -40,52 +44,85 @@ function detectRateQuery(message) {
 }
 
 export async function POST(req) {
-  try {
-    const { message } = await req.json();
-    if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
+  return withApi(req, async () => {
+    const user = await requireUser();
+
+    await enforceUserAndIpRateLimit(req, user.id, 'chat:send', {
+      userLimit: 20,
+      ipLimit: 40,
+      windowSeconds: 60,
+      failClosed: true,
+    });
+    await enforceRateLimit({
+      key: 'chat:global',
+      limit: 500,
+      windowSeconds: 60 * 60,
+      failClosed: true,
+    });
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({
-        reply: "Chat assistant is not configured yet. Add your GEMINI_API_KEY to .env.local to enable it.",
-      });
-    }
+    if (!apiKey) throw new ApiError(503, 'Assistant is not configured');
 
-    // Check if this is a rate question — if so, fetch live data
+    const body = await readJson(req, chatSchema, 4 * 1024);
+
     let rateContext = '';
-    const rateQuery = detectRateQuery(message);
+    const rateQuery = detectRateQuery(body.message);
     if (rateQuery) {
       try {
-        const rateData = await getRate(rateQuery.from, rateQuery.to, '100');
-        rateContext = `\n\n[LIVE RATE DATA — use this to answer]\n` +
-          `${rateQuery.from} → ${rateQuery.to}: 1 ${rateQuery.from} ≈ ${rateData.rate.toFixed(4)} ${rateQuery.to}\n` +
-          `100 ${rateQuery.from} ≈ ${rateData.estimatedReceive} ${rateQuery.to}\n` +
-          `Rate source: ${rateData.rateSource} (${rateData.rateSource === 'pathfind-amm' ? 'live AMM/DEX' : 'mid-market fallback'})\n` +
-          `Competitors: Western Union total=$${rateData.competitors.westernUnion.total}, ` +
-          `Wise total=$${rateData.competitors.wise.total}, Bank wire total=$${rateData.competitors.bankWire.total}, ` +
-          `Xenmo total=$${rateData.competitors.remitx.total}`;
-      } catch (e) {
-        console.error('Rate fetch for chat failed:', e.message);
+        const wallet = await getWalletByUserId(user.id);
+        if (wallet) {
+          const quote = await getQuote({
+            fromCurrency: rateQuery.from,
+            toCurrency: rateQuery.to,
+            amount: '100',
+            senderAddress: wallet.address,
+            receiverAddress: getIssuerAddress(rateQuery.to),
+          });
+          rateContext = `\n\n[LIVE TESTNET QUOTE]\n` +
+            `${rateQuery.from} -> ${rateQuery.to}: 1 ${rateQuery.from} ~= ${quote.rate.toFixed(4)} ${rateQuery.to}\n` +
+            `100 ${rateQuery.from} ~= ${quote.estimatedReceive} ${rateQuery.to}\n` +
+            `Minimum received: ${quote.minReceived} ${rateQuery.to}\n` +
+            `Rate source: ${quote.rateSource}\n` +
+            `Estimated fee: ${quote.fee}`;
+        }
+      } catch {
+        safeLog('warn', 'chat.rate_context_failed', {});
       }
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ parts: [{ text: message + rateContext }] }],
-        }),
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{ parts: [{ text: body.message + rateContext }] }],
+          }),
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) {
+        safeLog('error', 'chat.provider_failed', { status: response.status });
+        throw new ApiError(502, 'Chat is temporarily unavailable');
       }
-    );
 
-    const data = await response.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+      const data = await response.json();
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!reply) throw new ApiError(502, 'Chat is temporarily unavailable');
 
-    return NextResponse.json({ reply });
-  } catch (err) {
-    return NextResponse.json({ reply: 'Chat is temporarily unavailable.' }, { status: 500 });
-  }
+      return { reply };
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      safeLog('error', 'chat.request_failed', { code: error?.name || 'UnknownError' });
+      throw new ApiError(502, 'Chat is temporarily unavailable');
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
 }

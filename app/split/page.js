@@ -1,8 +1,9 @@
 // app/split/page.js
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '../components/WalletProvider';
+import { apiFetch, newIdempotencyKey } from '@/lib/client-api';
 
 export default function Split() {
   const { wallet, loading } = useWallet();
@@ -20,6 +21,11 @@ export default function Split() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [lookingUp, setLookingUp] = useState({});
+  const splitKeyRef = useRef(newIdempotencyKey());
+
+  useEffect(() => {
+    splitKeyRef.current = newIdempotencyKey();
+  }, [totalAmount, currency, splitMode, recipients]);
 
   // Lookup a username
   const lookupUser = async (index) => {
@@ -28,21 +34,18 @@ export default function Split() {
 
     setLookingUp((prev) => ({ ...prev, [index]: true }));
     try {
-      const res = await fetch(`/api/user?username=${encodeURIComponent(username)}`);
-      const data = await res.json();
+      const data = await apiFetch(`/api/user?username=${encodeURIComponent(username)}`);
       const updated = [...recipients];
       if (data.success) {
         updated[index].resolved = data.user;
         updated[index].error = '';
         updated[index].username = data.user.username;
-      } else {
-        updated[index].resolved = null;
-        updated[index].error = 'User not found';
       }
       setRecipients(updated);
-    } catch {
+    } catch (err) {
       const updated = [...recipients];
-      updated[index].error = 'Lookup failed';
+      updated[index].resolved = null;
+      updated[index].error = err.message || 'User not found';
       setRecipients(updated);
     }
     setLookingUp((prev) => ({ ...prev, [index]: false }));
@@ -85,20 +88,25 @@ export default function Split() {
     setError('');
     try {
       const splits = recipients.map((r) => ({
-        username: r.username,
+        to: r.username,
         amount: splitMode === 'equal' ? equalAmount : r.amount,
       }));
 
-      const res = await fetch('/api/split', {
+      const data = await apiFetch('/api/split', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senderSeed: wallet.seed, splits, currency }),
+        body: JSON.stringify({
+          currency,
+          idempotencyKey: splitKeyRef.current || newIdempotencyKey(),
+          splits,
+        }),
       });
-      const data = await res.json();
-      if (data.success) setResult(data);
-      else setError(data.error);
-    } catch {
-      setError('Split payment failed');
+
+      if (data.success) {
+        setResult(data);
+        splitKeyRef.current = newIdempotencyKey();
+      }
+    } catch (err) {
+      setError(err.message || 'Split payment failed');
     }
     setSending(false);
   };
@@ -131,7 +139,9 @@ export default function Split() {
 
         <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-2xl p-4 mb-4">
           <p className="text-xs text-[#8E8E93] text-center">
-            Share each code with the recipient. They&apos;ll see the split in their <strong className="text-[#1C1C1E]">Requests → Splits</strong> tab and claim it with the code.
+            {result.codesUnavailable
+              ? 'This split was already created. Claim codes are shown only once; unclaimed splits can be refunded from history after expiry.'
+              : 'Share each code with its recipient. They can also see the split in Requests → Claims and claim it with the code.'}
           </p>
         </div>
 
@@ -140,29 +150,36 @@ export default function Split() {
             <div key={i} className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-3xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <span className="font-bold text-[#1C1C1E]">@{s.username}</span>
+                  <span className="font-bold text-[#1C1C1E]">{s.username ? `@${s.username}` : 'Recipient'}</span>
                   {s.displayName && <span className="text-xs text-[#8E8E93] ml-2">{s.displayName}</span>}
                 </div>
                 <span className="font-extrabold text-[#1C1C1E]">{s.amount} {result.currency || 'USD'}</span>
               </div>
-              <div className="bg-[#FFFFFF] border border-[#E5E5EA] rounded-2xl p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] uppercase font-semibold text-[#8E8E93] tracking-wider mb-0.5">Their claim code</p>
-                  <code className="text-xl font-mono font-bold tracking-[0.2em] text-[#1C1C1E]">{s.code}</code>
+              {s.code && (
+                <div className="bg-[#FFFFFF] border border-[#E5E5EA] rounded-2xl p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] uppercase font-semibold text-[#8E8E93] tracking-wider mb-0.5">Their claim code</p>
+                    <code className="text-base font-mono font-bold tracking-wider text-[#1C1C1E] break-all">{s.code}</code>
+                  </div>
+                  <button
+                    onClick={() => navigator.clipboard?.writeText(s.code)}
+                    className="text-xs px-3.5 py-2 rounded-xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] transition-colors"
+                  >
+                    Copy
+                  </button>
                 </div>
-                <button
-                  onClick={() => navigator.clipboard?.writeText(s.code)}
-                  className="text-xs px-3.5 py-2 rounded-xl font-semibold bg-[#000000] text-white hover:bg-[#1C1C1E] transition-colors"
-                >
-                  Copy
-                </button>
-              </div>
+              )}
+              {s.status && (
+                <p className="text-[11px] text-[#8E8E93] mt-2 font-medium">
+                  Status: {s.status}{s.expiresAt ? ` · expires ${new Date(s.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                </p>
+              )}
             </div>
           ))}
         </div>
 
         <p className="text-xs text-[#8E8E93] text-center mb-6">
-          Unclaimed splits auto-refund to you in 10 minutes.
+          Unclaimed splits can be refunded from history after expiry.
         </p>
 
         <button
@@ -335,7 +352,7 @@ export default function Split() {
             <span className="font-semibold text-[#1C1C1E]">{splitMode === 'equal' ? equalAmount : 'Custom'} {currency}</span>
           </div>
           <p className="text-xs text-[#8E8E93] mt-3 pt-3 border-t border-[#E5E5EA]">
-            Each person gets a 6-digit claim code. Unclaimed funds auto-refund in 10 min.
+            Each person gets a 10-character claim code. Unclaimed funds can be refunded after expiry.
           </p>
         </div>
       )}

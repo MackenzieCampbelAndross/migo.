@@ -3,6 +3,7 @@ import './globals.css';
 import { WalletProvider } from './components/WalletProvider';
 import Nav from './components/Nav';
 import ChatBot from './components/ChatBot';
+import ServiceWorkerRegister from './components/ServiceWorkerRegister';
 
 export const metadata = {
   title: 'Migo — Send Money Anywhere',
@@ -35,6 +36,7 @@ export default function RootLayout({ children }) {
           </main>
           <Nav />
           <ChatBot />
+          <ServiceWorkerRegister />
         </WalletProvider>
       </body>
     </html>

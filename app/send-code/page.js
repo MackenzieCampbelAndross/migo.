@@ -1,8 +1,9 @@
 // app/send-code/page.js
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '../components/WalletProvider';
+import { apiFetch, newIdempotencyKey } from '@/lib/client-api';
 
 export default function SendCode() {
   const { wallet, loading: walletLoading } = useWallet();
@@ -19,6 +20,11 @@ export default function SendCode() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const createKeyRef = useRef(null);
+
+  useEffect(() => {
+    createKeyRef.current = newIdempotencyKey();
+  }, [amount, currency, recipientUsername]);
 
   // Countdown timer
   useEffect(() => {
@@ -35,21 +41,23 @@ export default function SendCode() {
     setCreating(true);
     setError('');
     try {
-      const res = await fetch('/api/escrow', {
+      const data = await apiFetch('/api/escrow', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          senderSeed: wallet.seed,
           amount,
           currency,
-          recipientUsername: recipientUsername.trim() || undefined,
+          to: recipientUsername.trim() || undefined,
+          idempotencyKey: createKeyRef.current || newIdempotencyKey(),
           cancelSeconds: 300,
         }),
       });
-      const data = await res.json();
-      if (data.success) setEscrow(data);
-      else setError(data.error);
-    } catch (e) { setError('Failed to create escrow'); }
+      if (data.success) {
+        setEscrow(data);
+        createKeyRef.current = newIdempotencyKey();
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to create escrow');
+    }
     setCreating(false);
   };
 
@@ -79,20 +87,23 @@ export default function SendCode() {
           <h2 className="text-xl font-bold text-[#1C1C1E]">Share This Code</h2>
           <p className="text-sm text-[#8E8E93] mt-1">
             {escrow.recipientUsername
-              ? <>Code sent — it&apos;ll appear on <span className="font-semibold text-[#1C1C1E]">@{escrow.recipientUsername}</span>&apos;s requests page</>
+              ? <>Share this code with <span className="font-semibold text-[#1C1C1E]">@{escrow.recipientUsername}</span>. It also appears in their pending claims.</>
               : <>Recipient enters this at <span className="font-mono text-[#1C1C1E]">/claim</span></>}
           </p>
         </div>
 
         <div className="bg-[#F2F2F7] border border-[#E5E5EA] rounded-3xl p-6 text-center mb-6 shadow-sm">
-          <p className="font-mono font-bold text-[#1C1C1E] mb-4 text-3xl tracking-widest">
+          <p className="font-mono font-bold text-[#1C1C1E] mb-2 text-2xl tracking-wider break-all">
             {escrow.code}
+          </p>
+          <p className="text-[10px] text-[#8E8E93] uppercase tracking-wider font-semibold mb-3">
+            10-character claim code
           </p>
           <p className="text-sm text-[#8E8E93]">
             {timeLeft > 0 ? (
               <>Expires in <span className="font-mono font-semibold text-[#1C1C1E]">{mins}:{secs.toString().padStart(2, '0')}</span></>
             ) : (
-              <span className="text-[#636366] font-semibold">Expired — funds returned to you</span>
+              <span className="text-[#636366] font-semibold">Expired — refund available in your history</span>
             )}
           </p>
           <p className="text-xl font-bold text-[#1C1C1E] mt-3">{escrow.displayAmount} {escrow.currency}</p>
@@ -165,7 +176,7 @@ export default function SendCode() {
               <option value="NGN">NGN</option>
             </select>
           </div>
-          <p className="text-xs text-[#8E8E93] col-span-2">Funds locked for 5 minutes. Auto-refunded if unclaimed.</p>
+          <p className="text-xs text-[#8E8E93] col-span-2">Funds are held for 5 minutes. If unclaimed, the sender can refund from history after expiry.</p>
         </div>
 
         {error && <p className="text-[#1C1C1E] font-semibold text-sm bg-[#F2F2F7] border border-[#E5E5EA] p-3 rounded-xl">{error}</p>}
