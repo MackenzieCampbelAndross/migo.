@@ -1,5 +1,9 @@
 const isProd = process.env.NODE_ENV === 'production';
 
+const devConnect = isProd
+  ? ''
+  : ' ws://localhost:3000 ws://10.0.2.2:3000 ws://192.168.1.11:3000';
+
 const csp = [
   "default-src 'self'",
   // Next.js injects inline hydration scripts; a nonce-based CSP is a follow-up.
@@ -7,7 +11,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${devConnect}`,
   "media-src 'self'",
   "worker-src 'self' blob:",
   "frame-ancestors 'none'",
@@ -41,6 +45,7 @@ if (isProd) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: ['localhost', '10.0.2.2', '192.168.1.11'],
   // xrpl.js uses Node crypto — needs this for server-side
   serverExternalPackages: ['xrpl'],
   async headers() {

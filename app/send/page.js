@@ -1,6 +1,6 @@
 // app/send/page.js
 'use client';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useWallet } from '../components/WalletProvider';
 import { apiFetch, newIdempotencyKey } from '@/lib/client-api';
@@ -92,6 +92,8 @@ function SendInner() {
       setReceipt(data);
       sendKeyRef.current = newIdempotencyKey();
     } catch (err) {
+      // Keep the key only when the outcome is unknown, so a resend can't double-pay.
+      if (err.status && !/being processed/i.test(err.message || '')) sendKeyRef.current = newIdempotencyKey();
       setError(err.message || 'Payment failed');
       setShowGlobe(false);
     }

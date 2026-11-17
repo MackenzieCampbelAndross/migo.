@@ -11,6 +11,9 @@
     "bootstrap": "node scripts/bootstrap.js"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.98.0",
     "autoprefixer": "^10.4.27",

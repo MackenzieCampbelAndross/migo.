@@ -12,9 +12,26 @@ import {
   STARTING_BALANCES,
 } from '@/lib/xrpl-wallet';
 import { createWalletSchema, importWalletSchema } from '@/lib/validation';
+import { requireOnboardingPhone } from '@/lib/onboarding';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+
+async function reserveWalletCreation(userId) {
+  const admin = createAdminClient();
+  const key = `wallet:creation-lock:${userId}`;
+  const startedAt = new Date().toISOString();
+  const { error: cleanupError } = await admin.from('rate_limits').delete().eq('rate_key', key)
+    .lt('window_start', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+  if (cleanupError) throw new ApiError(503, 'Wallet creation is temporarily unavailable');
+  const { error } = await admin.from('rate_limits').insert({ rate_key: key, window_start: startedAt, count: 1 });
+  if (error?.code === '23505') throw new ApiError(409, 'Your wallet is already being created. Please wait.');
+  if (error) throw new ApiError(503, 'Wallet creation is temporarily unavailable');
+  return async () => {
+    const { error: releaseError } = await admin.from('rate_limits').delete().eq('rate_key', key).eq('window_start', startedAt);
+    if (releaseError) safeLog('error', 'wallet.creation_lock_release_failed', { userId });
+  };
+}
 
 async function getWalletRow(userId) {
   const admin = createAdminClient();
@@ -42,13 +59,11 @@ async function getProfileRow(userId) {
   return data;
 }
 
-async function ensureProfile(userId, body, existingProfile) {
-  if (existingProfile) return existingProfile;
-
+async function ensureProfile(userId, body) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('profiles')
-    .insert({
+    .upsert({
       id: userId,
       username: body.username,
       display_name: body.displayName,
@@ -87,7 +102,8 @@ async function insertWallet(userId, address, encryptedSeed) {
 
 export async function POST(req) {
   return withApi(req, async () => {
-    const user = await requireUser();
+    const user = await requireUser({ allowLocked: true });
+    await requireOnboardingPhone(user.id);
     await enforceUserAndIpRateLimit(req, user.id, 'wallet:create', {
       userLimit: 3,
       ipLimit: 10,
@@ -95,13 +111,14 @@ export async function POST(req) {
       failClosed: true,
     });
 
+    const release = await reserveWalletCreation(user.id);
+    try {
     if (await getWalletRow(user.id)) {
       throw new ApiError(409, 'This account already has a wallet');
     }
 
-    const body = await readJson(req, createWalletSchema, 8 * 1024);
-    const existingProfile = await getProfileRow(user.id);
-    const profile = await ensureProfile(user.id, body, existingProfile);
+    const body = await readJson(req, createWalletSchema.refine(value => value.displayName.length > 0), 8 * 1024);
+    const profile = await ensureProfile(user.id, body);
 
     let created;
     try {
@@ -146,6 +163,9 @@ export async function POST(req) {
       baseCurrency: profile.base_currency,
       startingBalance: funded ? startingAmount : null,
     };
+    } finally {
+      await release();
+    }
   });
 }
 
@@ -176,7 +196,7 @@ export async function PUT(req) {
           username: body.username,
           displayName: body.displayName,
           baseCurrency: body.baseCurrency,
-        }, null);
+        });
 
     let imported;
     try {

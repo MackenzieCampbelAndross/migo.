@@ -2,11 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Sofia Sans';
+  src: url('/fonts/sofia-sans-bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  src: url('/fonts/roboto-medium.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
 html, body {
   background: #F5F5F7;
   color: #1C1C1E;
   margin: 0;
   padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.font-display {
+  font-family: 'Geist', 'Inter', system-ui, sans-serif;
 }
 
 /* Smooth mobile feel */
@@ -89,4 +113,46 @@ select option {
 /* Safe area for notched phones (iOS) */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Onboarding step flow (View Transitions) */
+html[data-flow]::view-transition-group(*) { animation-duration: 520ms; animation-timing-function: cubic-bezier(.32, .72, 0, 1); }
+html[data-flow="fade"]::view-transition-old(root),
+html[data-flow="fade"]::view-transition-new(root) { animation-duration: 360ms; }
+html[data-flow="forward"]::view-transition-old(root) { animation: 520ms cubic-bezier(.32, .72, 0, 1) both migo-flow-recede; }
+html[data-flow="forward"]::view-transition-new(root) { animation: 520ms cubic-bezier(.32, .72, 0, 1) both migo-flow-enter; }
+html[data-flow="back"]::view-transition-old(root) { z-index: 1; animation: 480ms cubic-bezier(.32, .72, 0, 1) both migo-flow-exit; }
+html[data-flow="back"]::view-transition-new(root) { animation: 480ms cubic-bezier(.32, .72, 0, 1) both migo-flow-return; }
+html[data-flow^="content"] [data-flow-content] { view-transition-name: migo-content; }
+html[data-flow^="content"]::view-transition-old(root),
+html[data-flow^="content"]::view-transition-new(root) { animation-duration: 420ms; }
+html[data-flow^="content"]::view-transition-group(migo-content) { animation: none; }
+html[data-flow="content-forward"]::view-transition-old(migo-content) { animation: 300ms cubic-bezier(.4, 0, 1, 1) both migo-content-out; }
+html[data-flow="content-forward"]::view-transition-new(migo-content) { animation: 460ms 120ms cubic-bezier(.32, .72, 0, 1) both migo-content-in; }
+html[data-flow="content-back"]::view-transition-old(migo-content) { animation: 300ms cubic-bezier(.4, 0, 1, 1) both migo-content-out-back; }
+html[data-flow="content-back"]::view-transition-new(migo-content) { animation: 460ms 120ms cubic-bezier(.32, .72, 0, 1) both migo-content-in-back; }
+html[data-flow="drop"] [data-flow-panel],
+html[data-flow="lift"] [data-flow-panel] { view-transition-name: migo-panel; }
+html[data-flow="drop"]::view-transition-old(root) { animation: 420ms ease both migo-fade-out; }
+html[data-flow="drop"]::view-transition-new(root) { animation: 420ms 120ms ease both migo-fade-in; }
+html[data-flow="drop"]::view-transition-new(migo-panel) { animation: 700ms cubic-bezier(.22, 1, .36, 1) both migo-panel-drop; }
+html[data-flow="lift"]::view-transition-old(migo-panel) { animation: 460ms cubic-bezier(.55, 0, .75, .2) both migo-panel-lift; }
+html[data-flow="lift"]::view-transition-old(root) { animation: 460ms ease both migo-fade-out; }
+html[data-flow="lift"]::view-transition-new(root) { animation: 460ms ease both migo-fade-in; }
+@keyframes migo-panel-drop { from { transform: translateY(-100%); } }
+@keyframes migo-panel-lift { to { transform: translateY(-100%); } }
+@keyframes migo-fade-out { to { opacity: 0; } }
+@keyframes migo-fade-in { from { opacity: 0; } }
+@keyframes migo-flow-recede { to { transform: translateX(-26%) scale(.98); opacity: .55; } }
+@keyframes migo-flow-enter { from { transform: translateX(100%); } }
+@keyframes migo-flow-exit { to { transform: translateX(100%); } }
+@keyframes migo-flow-return { from { transform: translateX(-26%) scale(.98); opacity: .55; } }
+@keyframes migo-content-out { to { transform: translateX(-36px); opacity: 0; } }
+@keyframes migo-content-in { from { transform: translateX(48px); opacity: 0; } }
+@keyframes migo-content-out-back { to { transform: translateX(36px); opacity: 0; } }
+@keyframes migo-content-in-back { from { transform: translateX(-48px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-flow]::view-transition-group(*),
+  html[data-flow]::view-transition-old(*),
+  html[data-flow]::view-transition-new(*) { animation: none !important; }
 }
